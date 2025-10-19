@@ -1,5 +1,14 @@
 {
-  "compilerOptions": {},
+  "compilerOptions": {
+    "jsx": "react-native",
+    "strict": false
+  },
   "extends": "expo/tsconfig.base",
-  "exclude": ["scripts/**/*"]
+  "exclude": [
+    "scripts/**/*",
+    "**/*.backup.ts",
+    "**/*.backup.tsx",
+    "**/*.backup.js",
+    "**/*.backup.jsx"
+  ]
 }
