@@ -5,7 +5,8 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker } from 'react-native-maps';
+import { Platform } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -90,7 +91,6 @@ export default function MapScreen() {
         ref={mapRef}
         style={styles.map}
         initialRegion={initialRegion}
-        provider={PROVIDER_GOOGLE}
       >
         {/* Point bleu pour la gare de départ */}
         <Marker
