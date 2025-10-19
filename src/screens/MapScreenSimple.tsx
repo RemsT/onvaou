@@ -108,12 +108,11 @@ export default function MapScreen() {
         {/* Points rouges pour les destinations (exclure la gare de départ) */}
         {uniqueResults
           .filter(result =>
-            result.to_station.lat !== fromStation.lat ||
-            result.to_station.lon !== fromStation.lon
+            result.to_station.id !== fromStation.id
           )
-          .map((result) => (
+          .map((result, index) => (
             <Marker
-              key={`marker-${result.to_station.id}`}
+              key={`marker-${result.to_station.id}-${index}`}
               coordinate={{
                 latitude: result.to_station.lat,
                 longitude: result.to_station.lon,
