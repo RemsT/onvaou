@@ -1,0 +1,84 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Expo
+.expo/
+.expo-shared/
+dist/
+web-build/
+
+# Native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# Debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+*.pem
+
+# Local Gradle files
+.gradle
+local.properties
+
+# Android
+android/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# iOS
+ios/
+*.ipa
+*.xcworkspace
+*.xcuserdata
+Pods/
+*.hmap
+*.ipa
+
+# Temporary files
+*.swp
+*.swo
+*~
+.tmp/
+.cache/
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Testing
+coverage/
+.nyc_output
+
+# Typescript
+*.tsbuildinfo
+
+# EAS
+.eas-build-pre-install.sh
