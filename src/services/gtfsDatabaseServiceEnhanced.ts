@@ -61,6 +61,22 @@ class GTFSDatabaseServiceEnhanced {
   private initialized = false;
 
   /**
+   * Ferme la connexion à la base de données
+   */
+  async close(): Promise<void> {
+    if (this.db) {
+      try {
+        await this.db.closeAsync();
+        console.log('✅ Connexion GTFS fermée');
+      } catch (error) {
+        console.error('Erreur lors de la fermeture de la connexion GTFS:', error);
+      }
+      this.db = null;
+      this.initialized = false;
+    }
+  }
+
+  /**
    * Initialise la connexion à la base de données
    * Note: La base de données est créée automatiquement par gtfsInitializationService
    * au premier lancement de l'application
@@ -93,30 +109,118 @@ class GTFSDatabaseServiceEnhanced {
 
       if (viewExists.length === 0) {
         console.error('❌ PROBLÈME: La vue direct_connections n\'existe pas !');
-      } else {
-        console.log('✅ Vue direct_connections existe');
+        console.log('🔧 Création automatique de la vue direct_connections...');
 
-        // Compter les connexions
-        const count = await this.db.getFirstAsync<{ count: number }>(
-          `SELECT COUNT(*) as count FROM direct_connections LIMIT 1`
+        // Créer la vue automatiquement
+        await this.createDirectConnectionsView();
+
+        console.log('✅ Vue direct_connections créée avec succès');
+      }
+
+      // Vérifier le contenu de la vue (que ce soit une vue existante ou nouvellement créée)
+      const count = await this.db.getFirstAsync<{ count: number }>(
+        `SELECT COUNT(*) as count FROM direct_connections LIMIT 1`
+      );
+
+      console.log(`📊 Nombre de connexions dans direct_connections: ${count?.count || 0}`);
+
+      if (count && count.count > 0) {
+        // Afficher un exemple de connexion
+        const example = await this.db.getFirstAsync<any>(
+          `SELECT from_stop_id, to_stop_id, departure_time FROM direct_connections LIMIT 1`
         );
+        console.log(`📌 Exemple de connexion: ${example?.from_stop_id} -> ${example?.to_stop_id} à ${example?.departure_time}`);
 
-        console.log(`📊 Nombre de connexions dans direct_connections: ${count?.count || 0}`);
-
-        if (count && count.count > 0) {
-          // Afficher un exemple de connexion
-          const example = await this.db.getFirstAsync<any>(
-            `SELECT from_stop_id, to_stop_id, departure_time FROM direct_connections LIMIT 1`
-          );
-          console.log(`📌 Exemple de connexion: ${example?.from_stop_id} -> ${example?.to_stop_id} à ${example?.departure_time}`);
-        } else {
-          console.error('❌ PROBLÈME: La vue direct_connections est VIDE !');
-        }
+        // Afficher les types de trains dans la base
+        const routeTypes = await this.db.getAllAsync<any>(
+          `SELECT route_short_name, COUNT(*) as count
+           FROM routes
+           GROUP BY route_short_name
+           ORDER BY count DESC
+           LIMIT 10`
+        );
+        console.log(`🚂 Types de trains dans la base GTFS:`);
+        routeTypes.forEach(rt => {
+          console.log(`   ${rt.route_short_name || 'N/A'}: ${rt.count} routes`);
+        });
+      } else {
+        console.error('❌ PROBLÈME: La vue direct_connections est VIDE !');
+        console.error('💡 Les tables sous-jacentes (stop_times, trips, routes, stops) sont probablement vides');
+        console.error('💡 Solution: Réinitialiser la base de données GTFS complètement');
       }
     } catch (error) {
       console.error('❌ Erreur lors de l\'initialisation de la DB GTFS:', error);
       throw error;
     }
+  }
+
+  /**
+   * Crée la vue direct_connections si elle n'existe pas
+   */
+  private async createDirectConnectionsView(): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    await this.db.execAsync(`
+      CREATE VIEW IF NOT EXISTS direct_connections AS
+      SELECT
+        st1.trip_id,
+        st1.stop_id as from_stop_id,
+        s1.stop_name as from_stop_name,
+        s1.stop_lat as from_lat,
+        s1.stop_lon as from_lon,
+        st1.departure_time,
+        st1.arrival_time as from_arrival_time,
+        st2.stop_id as to_stop_id,
+        s2.stop_name as to_stop_name,
+        s2.stop_lat as to_lat,
+        s2.stop_lon as to_lon,
+        st2.arrival_time,
+        st2.departure_time as to_departure_time,
+        st2.stop_sequence - st1.stop_sequence as nb_stops,
+        r.route_short_name,
+        r.route_long_name,
+        t.service_id,
+        t.trip_headsign
+      FROM stop_times st1
+      JOIN stop_times st2 ON st1.trip_id = st2.trip_id
+        AND st2.stop_sequence > st1.stop_sequence
+      JOIN stops s1 ON st1.stop_id = s1.stop_id
+      JOIN stops s2 ON st2.stop_id = s2.stop_id
+      JOIN trips t ON st1.trip_id = t.trip_id
+      JOIN routes r ON t.route_id = r.route_id;
+    `);
+
+    // Créer les index critiques pour optimiser les requêtes de recherche
+    await this.createOptimizationIndexes();
+  }
+
+  /**
+   * Crée les index d'optimisation pour accélérer les recherches
+   */
+  private async createOptimizationIndexes(): Promise<void> {
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
+
+    console.log('🚀 Création des index d\'optimisation...');
+
+    // Index pour les recherches sur stops avec parent_station
+    await this.db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_stops_parent_lookup ON stops(stop_id, parent_station);
+    `);
+
+    // Index pour améliorer les jointures dans findAllDestinationsWithOneTransfer
+    await this.db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_stop_times_trip_seq ON stop_times(trip_id, stop_sequence);
+    `);
+
+    await this.db.execAsync(`
+      CREATE INDEX IF NOT EXISTS idx_stop_times_stop_dep_time ON stop_times(stop_id, departure_time);
+    `);
+
+    console.log('✅ Index d\'optimisation créés');
   }
 
   /**
@@ -281,7 +385,8 @@ class GTFSDatabaseServiceEnhanced {
     departureTimeMin?: string,
     departureTimeMax?: string,
     maxWaitMinutes: number = 120,
-    limit: number = 500
+    limit: number = 500,
+    maxTotalDuration?: number
   ): Promise<Map<string, JourneyWithTransfer>> {
     if (!this.db) {
       throw new Error('Database not initialized');
@@ -300,6 +405,8 @@ class GTFSDatabaseServiceEnhanced {
         leg1.arrival_time as transfer_arrival,
         leg1.route_short_name as route1,
         leg1.to_stop_name as transfer_station,
+        leg1.to_lat as transfer_lat,
+        leg1.to_lon as transfer_lon,
 
         -- Deuxième segment
         leg2.departure_time as transfer_departure,
@@ -329,7 +436,7 @@ class GTFSDatabaseServiceEnhanced {
         ${departureTimeMax ? 'AND leg1.departure_time <= ?' : ''}
         AND transfer_wait_minutes >= 5
         AND transfer_wait_minutes <= ?
-        AND total_duration_minutes <= 480
+        ${maxTotalDuration ? 'AND total_duration_minutes <= ?' : ''}
 
       ORDER BY leg2.to_stop_id, total_duration_minutes
       LIMIT ?;
@@ -338,10 +445,38 @@ class GTFSDatabaseServiceEnhanced {
     const params: any[] = [fromStopId, fromStopId];
     if (departureTimeMin) params.push(departureTimeMin);
     if (departureTimeMax) params.push(departureTimeMax);
-    params.push(maxWaitMinutes, limit);
+    params.push(maxWaitMinutes);
+    if (maxTotalDuration) params.push(maxTotalDuration);
+    params.push(limit);
+
+    console.log(`[findAllDestinationsWithOneTransfer] 📝 Paramètres: fromStopId=${fromStopId}, timeMin=${departureTimeMin}, timeMax=${departureTimeMax}, maxWait=${maxWaitMinutes}, maxTotalDuration=${maxTotalDuration || 'N/A'}, limit=${limit}`);
+
+    // DEBUG: Vérifier si la vue direct_connections existe et contient des données
+    try {
+      const countResult = await this.db.getAllAsync<any>('SELECT COUNT(*) as count FROM direct_connections LIMIT 1');
+      console.log(`[findAllDestinationsWithOneTransfer] 📊 Nombre de lignes dans direct_connections: ${countResult[0]?.count || 0}`);
+    } catch (error) {
+      console.error(`[findAllDestinationsWithOneTransfer] ❌ Erreur en vérifiant direct_connections:`, error);
+    }
 
     const results = await this.db.getAllAsync<any>(query, params);
     console.log(`[findAllDestinationsWithOneTransfer] ✅ ${results.length} trajets avec correspondance trouvés`);
+
+    // DEBUG: Afficher quelques exemples si trouvés
+    if (results.length > 0) {
+      console.log(`[findAllDestinationsWithOneTransfer] 🔍 Exemples:`, results.slice(0, 3).map(r => `${r.destination_name} via ${r.transfer_station}`));
+    }
+
+    // DEBUG: Vérifier si Annecy est dans les résultats
+    const annecyResults = results.filter(r => r.destination_name && r.destination_name.toLowerCase().includes('annecy'));
+    if (annecyResults.length > 0) {
+      console.log(`[findAllDestinationsWithOneTransfer] 🎯 Annecy trouvé: ${annecyResults.length} trajets`);
+      annecyResults.forEach(r => {
+        console.log(`   → ${r.destination_name} via ${r.transfer_station}, durée: ${r.total_duration_minutes}min`);
+      });
+    } else {
+      console.log(`[findAllDestinationsWithOneTransfer] ⚠️ Annecy NOT FOUND dans les 2000 résultats SQL`);
+    }
 
     // Regrouper par destination (garder seulement le meilleur par destination)
     const destinationMap = new Map<string, JourneyWithTransfer>();
@@ -352,12 +487,19 @@ class GTFSDatabaseServiceEnhanced {
       // Si on a déjà une meilleure connexion pour cette destination, ignorer
       if (destinationMap.has(destId)) continue;
 
-      // Créer le journey simplifié
+      // Créer le journey avec les horaires de correspondance
       destinationMap.set(destId, {
         legs: [], // On ne stocke pas les détails complets pour économiser la mémoire
         totalDuration: row.total_duration_minutes,
         transferTime: row.transfer_wait_minutes,
-        transferStation: row.transfer_station
+        transferStation: row.transfer_station,
+        transferLat: row.transfer_lat,              // Coordonnées gare de correspondance
+        transferLon: row.transfer_lon,              // Coordonnées gare de correspondance
+        // Horaires détaillés pour affichage
+        departureTime: row.departure_time,           // Heure départ 1er train
+        transferArrival: row.transfer_arrival,       // Heure arrivée gare de correspondance
+        transferDeparture: row.transfer_departure,   // Heure départ gare de correspondance
+        arrivalTime: row.arrival_time                // Heure arrivée finale
       } as any);
     }
 

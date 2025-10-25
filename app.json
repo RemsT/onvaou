@@ -16,6 +16,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.r.s.onvaou",
       "buildNumber": "2",
+      "icon": "./assets/icon.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

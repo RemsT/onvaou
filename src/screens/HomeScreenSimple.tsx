@@ -21,6 +21,8 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigatorSimple';
 import { LocalStationService } from '../services/localStationService';
 import { HybridSearchService } from '../services/hybridSearchService';
+import { gtfsInitService, InitializationProgress } from '../services/gtfsInitializationService';
+import { DatabaseInitializationScreen } from '../components/DatabaseInitializationScreen';
 import { Station, CityLabel } from '../types';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -43,6 +45,17 @@ export default function HomeScreen() {
   const [showBudgetPickerModal, setShowBudgetPickerModal] = useState(false);
   const [timeRangeStart, setTimeRangeStart] = useState<string>('08:00');
   const [timeRangeEnd, setTimeRangeEnd] = useState<string>('20:00');
+  // Checkboxes pour les correspondances (par défaut toutes cochées)
+  const [showDirect, setShowDirect] = useState(true);
+  const [show1Transfer, setShow1Transfer] = useState(true);
+  const [show2Transfers, setShow2Transfers] = useState(true);
+  // État pour l'initialisation de la base de données
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [initProgress, setInitProgress] = useState<InitializationProgress>({
+    step: 'start',
+    progress: 0,
+    message: 'Démarrage...'
+  });
 
   const handleStationSearch = async (text: string) => {
     setStationSearch(text);
@@ -142,9 +155,20 @@ export default function HomeScreen() {
         timeRangeEnd
       );
 
+      // Filtrer les résultats selon les checkboxes de correspondances
+      const filteredResults = results.filter((result) => {
+        const transfers = result.transfers ?? 0; // 0 si undefined
+
+        if (transfers === 0 && showDirect) return true;
+        if (transfers === 1 && show1Transfer) return true;
+        if (transfers === 2 && show2Transfers) return true;
+
+        return false;
+      });
+
       navigation.navigate('ResultsList', {
         fromStation,
-        results,
+        results: filteredResults,
         mode: searchMode,
         maxValue: timeValue || budgetValue,
       });
@@ -169,6 +193,68 @@ export default function HomeScreen() {
     return `${hours}h${minutes}`;
   };
 
+  const handleResetDatabase = async () => {
+    Alert.alert(
+      'Réinitialiser la base de données',
+      'Cette opération va supprimer et recréer la base de données GTFS. Cela peut prendre 1-2 minutes. Continuer ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Réinitialiser',
+          style: 'destructive',
+          onPress: async () => {
+            setIsInitializing(true);
+            setInitProgress({
+              step: 'start',
+              progress: 0,
+              message: 'Démarrage de la réinitialisation...'
+            });
+
+            try {
+              await gtfsInitService.resetDatabase();
+
+              // Passer le callback de progression
+              await gtfsInitService.initializeDatabase((progress) => {
+                setInitProgress(progress);
+              });
+
+              setInitProgress({
+                step: 'complete',
+                progress: 100,
+                message: 'Base de données réinitialisée avec succès !'
+              });
+
+              // Attendre 2 secondes pour montrer le message de succès
+              setTimeout(() => {
+                setIsInitializing(false);
+                Alert.alert('Succès', 'Base de données réinitialisée avec succès !');
+              }, 2000);
+            } catch (error) {
+              setInitProgress({
+                step: 'error',
+                progress: 0,
+                message: error instanceof Error ? error.message : 'Erreur inconnue'
+              });
+
+              // Attendre 3 secondes avant de fermer l'écran d'erreur
+              setTimeout(() => {
+                setIsInitializing(false);
+                Alert.alert('Erreur', 'Échec de la réinitialisation de la base de données');
+              }, 3000);
+
+              console.error(error);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Afficher l'écran d'initialisation si en cours
+  if (isInitializing) {
+    return <DatabaseInitializationScreen progress={initProgress} />;
+  }
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -186,7 +272,7 @@ export default function HomeScreen() {
 
       <View style={styles.content}>
         {/* Station Card */}
-        <View style={styles.card}>
+        <View style={[styles.card, loading && styles.filterRowDisabled]}>
           <Text style={styles.cardTitle}>Gare de départ</Text>
 
           {fromStation ? (
@@ -198,6 +284,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 onPress={() => setFromStation(null)}
                 style={styles.changeButton}
+                disabled={loading}
               >
                 <Text style={styles.changeButtonText}>Modifier</Text>
               </TouchableOpacity>
@@ -211,6 +298,7 @@ export default function HomeScreen() {
                   placeholderTextColor="#999"
                   value={stationSearch}
                   onChangeText={handleStationSearch}
+                  editable={!loading}
                 />
               </View>
 
@@ -224,6 +312,7 @@ export default function HomeScreen() {
                         index < stationSuggestions.length - 1 && styles.suggestionBorder
                       ]}
                       onPress={() => handleSelectStation(station)}
+                      disabled={loading}
                     >
                       <Text style={styles.suggestionText}>{station.name}</Text>
                     </TouchableOpacity>
@@ -235,8 +324,8 @@ export default function HomeScreen() {
         </View>
 
         {/* Date & Time Range Card */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Date et intervalle de temps</Text>
+        <View style={[styles.card, loading && styles.filterRowDisabled]}>
+          <Text style={styles.cardTitle}>Date et heure de départ</Text>
           <CustomDateTimePicker
             value={selectedDate}
             onChange={setSelectedDate}
@@ -247,6 +336,7 @@ export default function HomeScreen() {
               setTimeRangeStart(start);
               setTimeRangeEnd(end);
             }}
+            disabled={loading}
           />
         </View>
 
@@ -258,13 +348,15 @@ export default function HomeScreen() {
           <View
             style={[
               styles.filterRow,
-              enableTimeFilter && styles.filterRowActive
+              enableTimeFilter && styles.filterRowActive,
+              loading && styles.filterRowDisabled
             ]}
           >
             <TouchableOpacity
               style={styles.filterLeftSection}
               onPress={() => setEnableTimeFilter(!enableTimeFilter)}
               activeOpacity={0.7}
+              disabled={loading}
             >
               <View style={[
                 styles.customCheckbox,
@@ -283,6 +375,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 style={styles.filterInputContainer}
                 onPress={() => setShowTimePickerModal(true)}
+                disabled={loading}
               >
                 <Text style={styles.filterValueInput}>{formatTimeDisplay(maxTime)}</Text>
               </TouchableOpacity>
@@ -293,13 +386,15 @@ export default function HomeScreen() {
           <View
             style={[
               styles.filterRow,
-              enableBudgetFilter && styles.filterRowActive
+              enableBudgetFilter && styles.filterRowActive,
+              loading && styles.filterRowDisabled
             ]}
           >
             <TouchableOpacity
               style={styles.filterLeftSection}
               onPress={() => setEnableBudgetFilter(!enableBudgetFilter)}
               activeOpacity={0.7}
+              disabled={loading}
             >
               <View style={[
                 styles.customCheckbox,
@@ -318,10 +413,68 @@ export default function HomeScreen() {
               <TouchableOpacity
                 style={styles.filterInputContainer}
                 onPress={() => setShowBudgetPickerModal(true)}
+                disabled={loading}
               >
                 <Text style={styles.filterValueInput}>{maxBudget} €</Text>
               </TouchableOpacity>
             )}
+          </View>
+
+          {/* Filtre de correspondances - 3 checkboxes sur la même ligne */}
+          <View style={[
+            styles.transfersFilterSection,
+            loading && styles.filterRowDisabled
+          ]}>
+            <Text style={styles.cardTitle}>Correspondances</Text>
+            <View style={styles.transfersCheckboxRowHorizontal}>
+              {/* 0 correspondance (Direct) */}
+              <TouchableOpacity
+                style={styles.transfersCheckboxItem}
+                onPress={() => setShowDirect(!showDirect)}
+                activeOpacity={0.7}
+                disabled={loading}
+              >
+                <View style={[
+                  styles.customCheckbox,
+                  showDirect && styles.customCheckboxActive
+                ]}>
+                  {showDirect && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+                <Text style={styles.transfersCheckboxLabelInline}>0</Text>
+              </TouchableOpacity>
+
+              {/* 1 correspondance */}
+              <TouchableOpacity
+                style={styles.transfersCheckboxItem}
+                onPress={() => setShow1Transfer(!show1Transfer)}
+                activeOpacity={0.7}
+                disabled={loading}
+              >
+                <View style={[
+                  styles.customCheckbox,
+                  show1Transfer && styles.customCheckboxActive
+                ]}>
+                  {show1Transfer && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+                <Text style={styles.transfersCheckboxLabelInline}>1</Text>
+              </TouchableOpacity>
+
+              {/* 2 correspondances */}
+              <TouchableOpacity
+                style={styles.transfersCheckboxItem}
+                onPress={() => setShow2Transfers(!show2Transfers)}
+                activeOpacity={0.7}
+                disabled={loading}
+              >
+                <View style={[
+                  styles.customCheckbox,
+                  show2Transfers && styles.customCheckboxActive
+                ]}>
+                  {show2Transfers && <Text style={styles.checkmark}>✓</Text>}
+                </View>
+                <Text style={styles.transfersCheckboxLabelInline}>2</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -350,6 +503,15 @@ export default function HomeScreen() {
             Sélectionnez un ou plusieurs filtres pour trouver les destinations accessibles depuis votre gare
           </Text>
         </View>
+
+        {/* Reset Database Button */}
+        <TouchableOpacity
+          style={styles.resetButton}
+          onPress={handleResetDatabase}
+          disabled={loading}
+        >
+          <Text style={styles.resetButtonText}>⚙️ Réinitialiser la base de données</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Label Selection Modal */}
@@ -522,6 +684,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#E8F5E9',
     borderColor: '#4CAF50',
   },
+  filterRowDisabled: {
+    opacity: 0.5,
+  },
   filterLeftSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -631,5 +796,50 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#1565C0',
     lineHeight: 18,
+  },
+
+  // Transfers Filter
+  transfersFilterSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E8EAED',
+  },
+  transfersFilterLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#5F6368',
+    marginBottom: 10,
+  },
+  transfersCheckboxRowHorizontal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 20,
+  },
+  transfersCheckboxItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  transfersCheckboxLabelInline: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0C3823',
+    marginLeft: 8,
+  },
+
+  // Reset Database Button
+  resetButton: {
+    backgroundColor: '#FF9800',
+    borderRadius: 10,
+    padding: 12,
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  resetButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

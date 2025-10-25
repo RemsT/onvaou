@@ -89,16 +89,57 @@ export default function DestinationDetailScreen() {
     });
   };
 
-  // Calculer la région de la carte pour afficher la destination
+  // Calculer la région de la carte pour afficher tous les points
   const getMapRegion = () => {
-    const lat = destination.to_station.lat;
-    const lon = destination.to_station.lon;
+    const points = [];
+
+    // Ajouter la gare de départ
+    if (destination.from_station) {
+      points.push({
+        lat: destination.from_station.lat,
+        lon: destination.from_station.lon,
+      });
+    }
+
+    // Ajouter la gare de correspondance si présente
+    if (destination.transferLat && destination.transferLon) {
+      points.push({
+        lat: destination.transferLat,
+        lon: destination.transferLon,
+      });
+    }
+
+    // Ajouter la gare d'arrivée
+    points.push({
+      lat: destination.to_station.lat,
+      lon: destination.to_station.lon,
+    });
+
+    // Calculer les limites (min/max) de tous les points
+    const lats = points.map(p => p.lat);
+    const lons = points.map(p => p.lon);
+
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLon = Math.min(...lons);
+    const maxLon = Math.max(...lons);
+
+    // Calculer le centre
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLon = (minLon + maxLon) / 2;
+
+    // Calculer les deltas avec une marge de 20%
+    const latDelta = (maxLat - minLat) * 1.4;
+    const lonDelta = (maxLon - minLon) * 1.4;
+
+    // Assurer un zoom minimum pour les trajets très courts
+    const minDelta = 0.1;
 
     return {
-      latitude: lat,
-      longitude: lon,
-      latitudeDelta: 0.3,
-      longitudeDelta: 0.3,
+      latitude: centerLat,
+      longitude: centerLon,
+      latitudeDelta: Math.max(latDelta, minDelta),
+      longitudeDelta: Math.max(lonDelta, minDelta),
     };
   };
 
@@ -121,10 +162,7 @@ export default function DestinationDetailScreen() {
             <View style={styles.infoCardCompact}>
               <Text style={styles.infoLabel}>Durée du trajet</Text>
               <Text style={styles.infoValue}>
-                {Math.floor(destination.duration / 60)}h
-                {destination.duration % 60 > 0
-                  ? ` ${destination.duration % 60}min`
-                  : ''}
+                {Math.floor(destination.duration / 60)}h{(destination.duration % 60).toString().padStart(2, '0')}
               </Text>
             </View>
 
@@ -141,34 +179,107 @@ export default function DestinationDetailScreen() {
 
         {/* Horaires */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Horaires</Text>
+          <Text style={styles.sectionTitle}>
+            Horaires pour le {departureTime.toLocaleDateString('fr-FR', {
+              day: 'numeric',
+              month: 'long'
+            })}
+          </Text>
           <View style={styles.timelineContainer}>
+            {/* Départ */}
             <View style={styles.timelineItem}>
               <View style={styles.timelineDot} />
               <View style={styles.timelineContent}>
-                <Text style={styles.timelineTime}>
-                  {departureTime.toLocaleTimeString('fr-FR', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
+                <View style={styles.timelineRow}>
+                  <Text style={styles.timelineTime}>
+                    {departureTime.toLocaleTimeString('fr-FR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                  {destination.from_station && (
+                    <Text style={styles.timelineStationBold}>
+                      {destination.from_station.name}
+                    </Text>
+                  )}
+                </View>
                 <Text style={styles.timelineLabel}>Départ</Text>
               </View>
             </View>
 
             <View style={styles.timelineLine} />
 
+            {/* Correspondance si présente */}
+            {destination.transfers !== undefined && destination.transfers > 0 && destination.transferStation && (
+              <>
+                {/* Arrivée à la gare de correspondance */}
+                <View style={styles.timelineItem}>
+                  <View style={[styles.timelineDot, styles.timelineDotTransfer]} />
+                  <View style={styles.timelineContent}>
+                    <View style={styles.timelineRow}>
+                      {destination.transferArrival && (
+                        <Text style={styles.timelineTimeTransfer}>
+                          {destination.transferArrival}
+                        </Text>
+                      )}
+                      <Text style={styles.timelineStationBold}>
+                        {destination.transferStation}
+                      </Text>
+                    </View>
+                    {/* Temps d'attente sous l'heure d'arrivée */}
+                    {destination.transferArrival && destination.transferDeparture && (() => {
+                      const [arrH, arrM] = destination.transferArrival.split(':').map(Number);
+                      const [depH, depM] = destination.transferDeparture.split(':').map(Number);
+                      const waitMinutes = (depH * 60 + depM) - (arrH * 60 + arrM);
+                      const waitHours = Math.floor(waitMinutes / 60);
+                      const waitMins = waitMinutes % 60;
+                      return (
+                        <Text style={styles.waitTime}>
+                          Attente: {waitHours}h{waitMins.toString().padStart(2, '0')}
+                        </Text>
+                      );
+                    })()}
+                  </View>
+                </View>
+                <View style={styles.timelineLine} />
+
+                {/* Départ de la gare de correspondance */}
+                <View style={styles.timelineItem}>
+                  <View style={[styles.timelineDot, styles.timelineDotTransfer]} />
+                  <View style={styles.timelineContent}>
+                    <View style={styles.timelineRow}>
+                      {destination.transferDeparture && (
+                        <Text style={styles.timelineTimeTransfer}>
+                          {destination.transferDeparture}
+                        </Text>
+                      )}
+                      <Text style={styles.timelineStationBold}>
+                        {destination.transferStation}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={styles.timelineLine} />
+              </>
+            )}
+
+            {/* Arrivée */}
             <View style={styles.timelineItem}>
               <View style={styles.timelineDot} />
               <View style={styles.timelineContent}>
-                <Text style={styles.timelineTime}>
-                  {arrivalTime.toLocaleTimeString('fr-FR', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </Text>
+                <View style={styles.timelineRow}>
+                  <Text style={styles.timelineTime}>
+                    {arrivalTime.toLocaleTimeString('fr-FR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                  <Text style={styles.timelineStationBold}>
+                    {destination.to_station.name}
+                  </Text>
+                </View>
                 <Text style={styles.timelineLabel}>
-                  Arrivée à {destination.to_station.name}
+                  Arrivée
                 </Text>
               </View>
             </View>
@@ -216,16 +327,47 @@ export default function DestinationDetailScreen() {
               rotateEnabled={true}
             >
               {mapReady && (
-                <Marker
-                  coordinate={{
-                    latitude: destination.to_station.lat,
-                    longitude: destination.to_station.lon,
-                  }}
-                  title={destination.to_station.name}
-                  anchor={{ x: 0.5, y: 0.5 }}
-                >
-                  <View style={styles.redMarker} />
-                </Marker>
+                <>
+                  {/* Gare de départ - Bleu */}
+                  {destination.from_station && (
+                    <Marker
+                      coordinate={{
+                        latitude: destination.from_station.lat,
+                        longitude: destination.from_station.lon,
+                      }}
+                      title={destination.from_station.name}
+                      anchor={{ x: 0.5, y: 0.5 }}
+                    >
+                      <View style={styles.blueMarker} />
+                    </Marker>
+                  )}
+
+                  {/* Gare de correspondance - Orange */}
+                  {destination.transfers !== undefined && destination.transfers > 0 && destination.transferStation && destination.transferLat && destination.transferLon && (
+                    <Marker
+                      coordinate={{
+                        latitude: destination.transferLat,
+                        longitude: destination.transferLon,
+                      }}
+                      title={destination.transferStation}
+                      anchor={{ x: 0.5, y: 0.5 }}
+                    >
+                      <View style={styles.orangeMarker} />
+                    </Marker>
+                  )}
+
+                  {/* Gare d'arrivée - Rouge */}
+                  <Marker
+                    coordinate={{
+                      latitude: destination.to_station.lat,
+                      longitude: destination.to_station.lon,
+                    }}
+                    title={destination.to_station.name}
+                    anchor={{ x: 0.5, y: 0.5 }}
+                  >
+                    <View style={styles.redMarker} />
+                  </Marker>
+                </>
               )}
             </MapView>
           </View>
@@ -300,7 +442,7 @@ const styles = StyleSheet.create({
   },
   timelineContainer: {
     backgroundColor: '#FFFFFF',
-    padding: 14,
+    padding: 12,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E8EAED',
@@ -315,32 +457,80 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   timelineDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: '#4CAF50',
     marginTop: 4,
-    marginRight: 12,
+    marginRight: 10,
   },
   timelineLine: {
     width: 2,
-    height: 30,
+    height: 20,
     backgroundColor: '#E8EAED',
-    marginLeft: 5,
-    marginVertical: 4,
+    marginLeft: 4,
+    marginVertical: 2,
   },
   timelineContent: {
     flex: 1,
   },
   timelineTime: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#0C3823',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   timelineLabel: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#5F6368',
+    marginTop: 1,
+  },
+  timelineStation: {
+    fontSize: 12,
+    color: '#5F6368',
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  timelineDotTransfer: {
+    backgroundColor: '#FFB74D',
+  },
+  transferBadge: {
+    backgroundColor: '#FFF3E0',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FFB74D',
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+  },
+  transferBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#F57C00',
+  },
+  timelineTimeTransfer: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#F57C00',
+    marginBottom: 2,
+  },
+  waitTime: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#F57C00',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  timelineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  timelineStationBold: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#0C3823',
   },
   bookingButton: {
     backgroundColor: '#4CAF50',
@@ -396,6 +586,32 @@ const styles = StyleSheet.create({
   map: {
     width: '100%',
     height: '100%',
+  },
+  blueMarker: {
+    backgroundColor: '#2196F3',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  orangeMarker: {
+    backgroundColor: '#FF9800',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
   },
   redMarker: {
     backgroundColor: '#F44336',

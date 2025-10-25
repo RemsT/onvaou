@@ -17,6 +17,7 @@ interface DateTimePickerProps {
   timeRangeStart?: string;
   timeRangeEnd?: string;
   onTimeRangeChange?: (start: string, end: string) => void;
+  disabled?: boolean;
 }
 
 const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
@@ -27,6 +28,7 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
   timeRangeStart = '00:00',
   timeRangeEnd = '23:59',
   onTimeRangeChange,
+  disabled = false,
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [tempDate, setTempDate] = useState(value || new Date());
@@ -332,14 +334,24 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
               {hours.map((hour, index) => {
                 const isSelected = index === selectedStartIndex;
                 return (
-                  <View key={`start-${hour}`} style={styles.wheelItem}>
+                  <TouchableOpacity
+                    key={`start-${hour}`}
+                    style={styles.wheelItem}
+                    onPress={() => {
+                      scrollViewStartRef.current?.scrollTo({
+                        y: index * ITEM_HEIGHT,
+                        animated: true,
+                      });
+                    }}
+                    activeOpacity={0.7}
+                  >
                     <Text style={[
                       styles.wheelItemText,
                       isSelected && styles.wheelItemTextSelected,
                     ]}>
                       {hour.toString().padStart(2, '0')}h00
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </ScrollView>
@@ -370,7 +382,20 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
                 const isSelected = index === selectedEndIndex;
                 const isDisabled = hour <= selectedStartIndex;
                 return (
-                  <View key={`end-${hour}`} style={styles.wheelItem}>
+                  <TouchableOpacity
+                    key={`end-${hour}`}
+                    style={styles.wheelItem}
+                    onPress={() => {
+                      if (!isDisabled) {
+                        scrollViewEndRef.current?.scrollTo({
+                          y: index * ITEM_HEIGHT,
+                          animated: true,
+                        });
+                      }
+                    }}
+                    activeOpacity={isDisabled ? 1 : 0.7}
+                    disabled={isDisabled}
+                  >
                     <Text style={[
                       styles.wheelItemText,
                       isSelected && styles.wheelItemTextSelected,
@@ -378,7 +403,7 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
                     ]}>
                       {hour.toString().padStart(2, '0')}h00
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </ScrollView>
@@ -408,6 +433,7 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
           <TouchableOpacity
             onPress={openModal}
             style={styles.modifyButton}
+            disabled={disabled}
           >
             <Text style={styles.modifyButtonText}>Modifier</Text>
           </TouchableOpacity>
@@ -417,6 +443,7 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
           style={styles.emptyButton}
           onPress={openModal}
           activeOpacity={0.7}
+          disabled={disabled}
         >
           <Text style={styles.emptyButtonText}>Sélectionner une date et un intervalle</Text>
         </TouchableOpacity>
@@ -440,7 +467,7 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
               <TouchableOpacity onPress={cancelSelection} style={styles.headerButton}>
                 <Text style={styles.cancelButton}>Annuler</Text>
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>Date et heure</Text>
+              <Text style={styles.modalTitle}>Date et heure de départ</Text>
               <TouchableOpacity
                 onPress={confirmDateTime}
                 style={styles.headerButton}

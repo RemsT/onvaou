@@ -102,6 +102,13 @@ export default function ResultsListScreen() {
             })}
           </Text>
         </View>
+        {item.transfers !== undefined && item.transfers > 0 && (
+          <View style={styles.transferBadge}>
+            <Text style={styles.transferBadgeText}>
+              {item.transfers} correspondance{item.transfers > 1 ? 's' : ''}
+            </Text>
+          </View>
+        )}
       </View>
       <StationLabels stationId={item.to_station_id} maxDisplay={3} compact />
     </TouchableOpacity>
@@ -426,5 +433,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#F57C00',
     lineHeight: 16,
+  },
+  transferBadge: {
+    backgroundColor: '#FFF3E0',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FFB74D',
+  },
+  transferBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#F57C00',
   },
 });

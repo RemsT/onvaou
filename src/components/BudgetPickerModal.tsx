@@ -103,7 +103,17 @@ export default function BudgetPickerModal({ visible, initialValue, onClose }: Bu
                 {budgetOptions.map((budget, index) => {
                   const isSelected = index === selectedIndex;
                   return (
-                    <View key={budget} style={styles.wheelItem}>
+                    <TouchableOpacity
+                      key={budget}
+                      style={styles.wheelItem}
+                      onPress={() => {
+                        scrollViewRef.current?.scrollTo({
+                          y: index * ITEM_HEIGHT,
+                          animated: true,
+                        });
+                      }}
+                      activeOpacity={0.7}
+                    >
                       <Text
                         style={[
                           styles.wheelItemText,
@@ -112,7 +122,7 @@ export default function BudgetPickerModal({ visible, initialValue, onClose }: Bu
                       >
                         {budget} €
                       </Text>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
               </ScrollView>

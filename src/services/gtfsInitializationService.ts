@@ -67,15 +67,26 @@ class GTFSInitializationService {
         message: 'Démarrage de l\'initialisation...'
       });
 
-      // Créer le dossier SQLite
+      // Créer le dossier SQLite avec permissions explicites
       const dbDir = `${FileSystem.documentDirectory}SQLite`;
       const dirInfo = await FileSystem.getInfoAsync(dbDir);
       if (!dirInfo.exists) {
+        console.log(`📁 Création du dossier: ${dbDir}`);
         await FileSystem.makeDirectoryAsync(dbDir, { intermediates: true });
+      } else {
+        console.log(`✓ Dossier SQLite existe: ${dbDir}`);
       }
 
-      // Créer la base de données
-      const db = await SQLite.openDatabaseAsync(this.dbName);
+      // Vérifier les permissions du dossier
+      console.log(`📂 Dossier SQLite: ${dbDir}`);
+      console.log(`📂 Chemin complet DB: ${this.dbPath}`);
+
+      // Créer la base de données avec options explicites
+      console.log(`🔓 Ouverture de la base de données en mode lecture/écriture...`);
+      const db = await SQLite.openDatabaseAsync(this.dbName, {
+        enableCRSQLite: false,
+        useNewConnection: true,
+      });
 
       // Créer la structure
       await this.createDatabaseStructure(db, onProgress);
@@ -326,39 +337,63 @@ class GTFSInitializationService {
     console.log(`📌 Index des colonnes: stop_id=${stopIdIdx}, stop_name=${stopNameIdx}, lat=${stopLatIdx}, lon=${stopLonIdx}`);
 
     // Utiliser une transaction pour l'insertion en masse
+    // Utiliser INSERT OR IGNORE pour éviter les erreurs de contrainte UNIQUE
     let importedCount = 0;
-    await db.withTransactionAsync(async () => {
-      const stmt = await db.prepareAsync(
-        'INSERT INTO stops (stop_id, stop_name, stop_lat, stop_lon, parent_station) VALUES (?, ?, ?, ?, ?)'
-      );
+    const seenStopIds = new Set<string>(); // Pour éviter les doublons
 
-      try {
-        for (let i = 1; i < rows.length; i++) {
-          const row = rows[i];
-          const locationType = row[locationTypeIdx] || '0';
+    console.log('📝 Début de la transaction d\'import...');
 
-          // Importer les StopPoint (location_type='0') ET les StopArea (location_type='1')
-          if (locationType === '0' || locationType === '1' || locationType === '') {
-            await stmt.executeAsync([
-              row[stopIdIdx],
-              row[stopNameIdx],
-              parseFloat(row[stopLatIdx]) || 0,
-              parseFloat(row[stopLonIdx]) || 0,
-              row[parentStationIdx] || null
-            ]);
-            importedCount++;
+    try {
+      await db.withTransactionAsync(async () => {
+        console.log('📝 Préparation du statement SQL...');
+        const stmt = await db.prepareAsync(
+          'INSERT OR IGNORE INTO stops (stop_id, stop_name, stop_lat, stop_lon, parent_station) VALUES (?, ?, ?, ?, ?)'
+        );
 
-            // Afficher quelques exemples avec leur type
-            if (i <= 3) {
-              const typeLabel = locationType === '1' ? 'StopArea' : 'StopPoint';
-              console.log(`   Exemple ${i} (${typeLabel}): ${row[stopIdIdx]} - ${row[stopNameIdx]}`);
+        try {
+          for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            const stopId = row[stopIdIdx];
+            const locationType = row[locationTypeIdx] || '0';
+
+            // Importer les StopPoint (location_type='0') ET les StopArea (location_type='1')
+            // Vérifier aussi qu'on n'a pas déjà vu ce stop_id
+            if ((locationType === '0' || locationType === '1' || locationType === '') && !seenStopIds.has(stopId)) {
+              await stmt.executeAsync([
+                stopId,
+                row[stopNameIdx],
+                parseFloat(row[stopLatIdx]) || 0,
+                parseFloat(row[stopLonIdx]) || 0,
+                row[parentStationIdx] || null
+              ]);
+              seenStopIds.add(stopId);
+              importedCount++;
+
+              // Afficher quelques exemples avec leur type
+              if (i <= 3) {
+                const typeLabel = locationType === '1' ? 'StopArea' : 'StopPoint';
+                console.log(`   Exemple ${i} (${typeLabel}): ${stopId} - ${row[stopNameIdx]}`);
+              }
+
+              // Log de progression tous les 1000 records
+              if (importedCount % 1000 === 0) {
+                console.log(`   Progression: ${importedCount} gares importées...`);
+              }
             }
           }
+          console.log('📝 Finalisation du statement...');
+        } catch (error) {
+          console.error('❌ Erreur lors de l\'exécution du statement:', error);
+          throw error;
+        } finally {
+          await stmt.finalizeAsync();
+          console.log('✅ Statement finalisé');
         }
-      } finally {
-        await stmt.finalizeAsync();
-      }
-    });
+      });
+    } catch (error) {
+      console.error('❌ Erreur lors de la transaction:', error);
+      throw error;
+    }
 
     console.log(`✅ ${importedCount} gares importées dans la base de données`);
   }
@@ -378,7 +413,7 @@ class GTFSInitializationService {
 
     await db.withTransactionAsync(async () => {
       const stmt = await db.prepareAsync(
-        'INSERT INTO routes (route_id, route_short_name, route_long_name, route_type) VALUES (?, ?, ?, ?)'
+        'INSERT OR IGNORE INTO routes (route_id, route_short_name, route_long_name, route_type) VALUES (?, ?, ?, ?)'
       );
 
       try {
@@ -414,7 +449,7 @@ class GTFSInitializationService {
 
     await db.withTransactionAsync(async () => {
       const stmt = await db.prepareAsync(
-        'INSERT INTO trips (trip_id, route_id, service_id, trip_headsign) VALUES (?, ?, ?, ?)'
+        'INSERT OR IGNORE INTO trips (trip_id, route_id, service_id, trip_headsign) VALUES (?, ?, ?, ?)'
       );
 
       try {
@@ -453,7 +488,7 @@ class GTFSInitializationService {
 
     await db.withTransactionAsync(async () => {
       const stmt = await db.prepareAsync(
-        'INSERT INTO stop_times (trip_id, stop_id, arrival_time, departure_time, stop_sequence) VALUES (?, ?, ?, ?, ?)'
+        'INSERT OR IGNORE INTO stop_times (trip_id, stop_id, arrival_time, departure_time, stop_sequence) VALUES (?, ?, ?, ?, ?)'
       );
 
       try {
@@ -494,7 +529,7 @@ class GTFSInitializationService {
 
     await db.withTransactionAsync(async () => {
       const stmt = await db.prepareAsync(
-        'INSERT INTO calendar_dates (service_id, date, exception_type) VALUES (?, ?, ?)'
+        'INSERT OR IGNORE INTO calendar_dates (service_id, date, exception_type) VALUES (?, ?, ?)'
       );
 
       try {
@@ -617,13 +652,25 @@ class GTFSInitializationService {
    */
   async resetDatabase(): Promise<void> {
     try {
+      // IMPORTANT: Fermer toutes les connexions ouvertes avant de supprimer
+      console.log('🔒 Fermeture des connexions existantes...');
+
+      // Importer dynamiquement pour éviter les dépendances circulaires
+      const { gtfsDbEnhanced } = await import('./gtfsDatabaseServiceEnhanced');
+      await gtfsDbEnhanced.close();
+
+      // Attendre un peu pour être sûr que la connexion est bien fermée
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       const dbInfo = await FileSystem.getInfoAsync(this.dbPath);
       if (dbInfo.exists) {
+        console.log('🗑️  Suppression de la base de données...');
         await FileSystem.deleteAsync(this.dbPath);
         console.log('✓ Base de données supprimée');
       }
     } catch (error) {
       console.error('Erreur lors de la suppression de la DB:', error);
+      throw error;
     }
   }
 }

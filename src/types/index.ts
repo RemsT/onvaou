@@ -64,6 +64,10 @@ export interface SearchResult {
   nb_transfers?: number; // Deprecated: use transfers instead
   transfers?: number; // Nombre de correspondances (0 = direct, 1 = 1 changement, etc.)
   transferStation?: string; // Nom de la gare de correspondance
+  transferLat?: number; // Latitude de la gare de correspondance
+  transferLon?: number; // Longitude de la gare de correspondance
+  transferArrival?: string; // Heure d'arrivée à la gare de correspondance
+  transferDeparture?: string; // Heure de départ de la gare de correspondance
   route_name?: string; // Nom de la route (ex: TGV, TER, etc.)
   route_type?: 'TGV' | 'INTERCITES' | 'TER' | 'RER' | 'AUTRE'; // Type de train
   navitia_data?: any; // Données complètes de Navitia si disponibles

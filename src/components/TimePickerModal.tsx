@@ -109,7 +109,17 @@ export default function TimePickerModal({ visible, initialValue, onClose }: Time
                   const [hours, minutes] = time.split(':');
                   const formattedTime = `${hours}h${minutes}`;
                   return (
-                    <View key={time} style={styles.wheelItem}>
+                    <TouchableOpacity
+                      key={time}
+                      style={styles.wheelItem}
+                      onPress={() => {
+                        scrollViewRef.current?.scrollTo({
+                          y: index * ITEM_HEIGHT,
+                          animated: true,
+                        });
+                      }}
+                      activeOpacity={0.7}
+                    >
                       <Text
                         style={[
                           styles.wheelItemText,
@@ -118,7 +128,7 @@ export default function TimePickerModal({ visible, initialValue, onClose }: Time
                       >
                         {formattedTime}
                       </Text>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
               </ScrollView>

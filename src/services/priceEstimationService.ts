@@ -4,6 +4,9 @@
  */
 
 export class PriceEstimationService {
+  // Cache pour les estimations de prix (évite les recalculs)
+  private static priceCache = new Map<string, { average: number; min: number; max: number }>();
+
   /**
    * Calcule une estimation du prix d'un trajet en train
    * Les prix sont basés sur :
@@ -20,6 +23,14 @@ export class PriceEstimationService {
     min: number;
     max: number;
   } {
+    // Créer une clé de cache (arrondie pour améliorer les hits)
+    const cacheKey = `${Math.round(distance / 10) * 10}-${Math.round(duration / 5) * 5}`;
+
+    // Vérifier le cache
+    const cached = this.priceCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
     // Déterminer le type de train probable selon distance et vitesse
     const speedKmH = (distance / duration) * 60;
 
@@ -108,11 +119,22 @@ export class PriceEstimationService {
     const max = Math.round((basePrice * maxMultiplier) / 5) * 5;
 
     // S'assurer que min < average < max
-    return {
+    const result = {
       average: Math.max(average, min + 5),
       min: Math.max(min, 5),
       max: Math.max(max, average + 10),
     };
+
+    // Mettre en cache le résultat
+    this.priceCache.set(cacheKey, result);
+
+    // Limiter la taille du cache (garder les 1000 derniers)
+    if (this.priceCache.size > 1000) {
+      const firstKey = this.priceCache.keys().next().value;
+      if (firstKey) this.priceCache.delete(firstKey);
+    }
+
+    return result;
   }
 
   /**

@@ -5,7 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Callout } from 'react-native-maps';
 import { Platform } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
@@ -22,7 +22,6 @@ export default function MapScreen() {
   const mapRef = useRef<MapView>(null);
 
   const { fromStation, results, mode, maxValue } = route.params;
-  const [selectedDestination, setSelectedDestination] = useState<SearchResult | null>(null);
 
   // Calculer la région initiale pour centrer la carte
   const initialRegion = {
@@ -117,12 +116,27 @@ export default function MapScreen() {
                 latitude: result.to_station.lat,
                 longitude: result.to_station.lon,
               }}
-              title={result.to_station.name}
-              description={`${result.duration} min - ${result.price.toFixed(2)}€`}
-              onPress={() => setSelectedDestination(result)}
               anchor={{ x: 0.5, y: 0.5 }}
             >
               <View style={styles.redMarker} />
+              <Callout
+                onPress={() => {
+                  navigation.navigate('DestinationDetail', {
+                    destination: result,
+                  });
+                }}
+                style={styles.callout}
+              >
+                <View style={styles.calloutContainer}>
+                  <Text style={styles.calloutTitle}>{result.to_station.name}</Text>
+                  <Text style={styles.calloutDescription}>
+                    {result.duration} min - {result.price.toFixed(2)}€
+                  </Text>
+                  <View style={styles.calloutIconContainer}>
+                    <Text style={styles.calloutIcon}>→</Text>
+                  </View>
+                </View>
+              </Callout>
             </Marker>
           ))}
       </MapView>
@@ -136,52 +150,23 @@ export default function MapScreen() {
       </TouchableOpacity>
 
       {/* Informations en bas */}
-      {selectedDestination ? (
-        <View style={styles.destinationCard}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.destinationName}>
-              {selectedDestination.to_station.name}
-            </Text>
-            <TouchableOpacity onPress={() => setSelectedDestination(null)}>
-              <Text style={styles.closeButton}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.destinationInfo}>
-            Durée: {selectedDestination.duration} min
-          </Text>
-          <Text style={styles.destinationInfo}>
-            Prix: {selectedDestination.price.toFixed(2)}€
-          </Text>
-          <TouchableOpacity
-            style={styles.detailButton}
-            onPress={() =>
-              navigation.navigate('DestinationDetail', {
-                destination: selectedDestination,
-              })
-            }
-          >
-            <Text style={styles.detailButtonText}>Voir les détails</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.infoCard}>
-          <Text style={styles.infoCardTitle}>
-            Depuis {fromStation.name}
-          </Text>
+      <View style={styles.infoCard}>
+        <Text style={styles.infoCardTitle}>
+          Depuis {fromStation.name}
+        </Text>
+        <Text style={styles.infoCardText}>
+          {results.length} destination{results.length > 1 ? 's' : ''} trouvée{results.length > 1 ? 's' : ''}
+        </Text>
+        {mode === 'time' && maxValue && (
           <Text style={styles.infoCardText}>
-            {results.length} destination{results.length > 1 ? 's' : ''} trouvée{results.length > 1 ? 's' : ''}
+            Temps max: {Math.floor(maxValue / 60)}h
+            {maxValue % 60 > 0 ? ` ${maxValue % 60}min` : ''}
           </Text>
-          {mode === 'time' && maxValue && (
-            <Text style={styles.infoCardText}>
-              Temps max: {Math.floor(maxValue / 60)}h
-              {maxValue % 60 > 0 ? ` ${maxValue % 60}min` : ''}
-            </Text>
-          )}
-          {mode === 'budget' && maxValue && (
-            <Text style={styles.infoCardText}>Budget max: {maxValue}€</Text>
-          )}
-        </View>
-      )}
+        )}
+        {mode === 'budget' && maxValue && (
+          <Text style={styles.infoCardText}>Budget max: {maxValue}€</Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -219,61 +204,33 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
   },
-  destinationCard: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E8EAED',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 8,
+  callout: {
+    width: 200,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
+  calloutContainer: {
+    padding: 8,
+    paddingRight: 28,
+    position: 'relative',
   },
-  destinationName: {
-    fontSize: 20,
+  calloutTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#0C3823',
-    flex: 1,
+    marginBottom: 2,
   },
-  closeButton: {
-    fontSize: 28,
+  calloutDescription: {
+    fontSize: 15,
     color: '#5F6368',
-    paddingLeft: 10,
   },
-  destinationInfo: {
-    fontSize: 16,
-    color: '#0C3823',
-    marginBottom: 8,
+  calloutIconContainer: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
   },
-  detailButton: {
-    backgroundColor: '#4CAF50',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 10,
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  detailButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
+  calloutIcon: {
+    fontSize: 22,
+    color: '#4CAF50',
+    fontWeight: 'bold',
   },
   infoCard: {
     position: 'absolute',
