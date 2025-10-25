@@ -97,14 +97,17 @@ class GTFSInitializationService {
       // Créer les vues et index
       await this.createViewsAndIndexes(db, onProgress);
 
-      // Optimiser
+      // Optimisation légère (ANALYZE seulement, pas de VACUUM qui est très lent)
       onProgress?.({
         step: 'optimize',
         progress: 95,
-        message: 'Optimisation de la base de données...'
+        message: 'Finalisation...'
       });
+      // VACUUM est très lent et pas nécessaire à la première initialisation
+      // await db.execAsync('VACUUM;');
+
+      // ANALYZE uniquement pour optimiser les requêtes
       await db.execAsync('ANALYZE;');
-      await db.execAsync('VACUUM;');
 
       await db.closeAsync();
 
@@ -313,6 +316,7 @@ class GTFSInitializationService {
 
   /**
    * Import des gares
+   * OPTIMISÉ: Import par batch
    */
   private async importStops(db: SQLite.SQLiteDatabase): Promise<void> {
     console.log('📍 Début import des gares...');
@@ -325,8 +329,6 @@ class GTFSInitializationService {
     }
 
     const headers = rows[0];
-    console.log(`📋 Headers: ${headers.join(', ')}`);
-
     const stopIdIdx = headers.indexOf('stop_id');
     const stopNameIdx = headers.indexOf('stop_name');
     const stopLatIdx = headers.indexOf('stop_lat');
@@ -334,68 +336,50 @@ class GTFSInitializationService {
     const parentStationIdx = headers.indexOf('parent_station');
     const locationTypeIdx = headers.indexOf('location_type');
 
-    console.log(`📌 Index des colonnes: stop_id=${stopIdIdx}, stop_name=${stopNameIdx}, lat=${stopLatIdx}, lon=${stopLonIdx}`);
-
-    // Utiliser une transaction pour l'insertion en masse
-    // Utiliser INSERT OR IGNORE pour éviter les erreurs de contrainte UNIQUE
+    const seenStopIds = new Set<string>();
+    const BATCH_SIZE = 100;
     let importedCount = 0;
-    const seenStopIds = new Set<string>(); // Pour éviter les doublons
 
-    console.log('📝 Début de la transaction d\'import...');
+    await db.withTransactionAsync(async () => {
+      let batchValues: any[] = [];
+      let batchPlaceholders: string[] = [];
 
-    try {
-      await db.withTransactionAsync(async () => {
-        console.log('📝 Préparation du statement SQL...');
-        const stmt = await db.prepareAsync(
-          'INSERT OR IGNORE INTO stops (stop_id, stop_name, stop_lat, stop_lon, parent_station) VALUES (?, ?, ?, ?, ?)'
-        );
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const stopId = row[stopIdIdx];
+        const locationType = row[locationTypeIdx] || '0';
 
-        try {
-          for (let i = 1; i < rows.length; i++) {
-            const row = rows[i];
-            const stopId = row[stopIdIdx];
-            const locationType = row[locationTypeIdx] || '0';
+        if ((locationType === '0' || locationType === '1' || locationType === '') && !seenStopIds.has(stopId)) {
+          batchPlaceholders.push('(?, ?, ?, ?, ?)');
+          batchValues.push(
+            stopId,
+            row[stopNameIdx],
+            parseFloat(row[stopLatIdx]) || 0,
+            parseFloat(row[stopLonIdx]) || 0,
+            row[parentStationIdx] || null
+          );
+          seenStopIds.add(stopId);
 
-            // Importer les StopPoint (location_type='0') ET les StopArea (location_type='1')
-            // Vérifier aussi qu'on n'a pas déjà vu ce stop_id
-            if ((locationType === '0' || locationType === '1' || locationType === '') && !seenStopIds.has(stopId)) {
-              await stmt.executeAsync([
-                stopId,
-                row[stopNameIdx],
-                parseFloat(row[stopLatIdx]) || 0,
-                parseFloat(row[stopLonIdx]) || 0,
-                row[parentStationIdx] || null
-              ]);
-              seenStopIds.add(stopId);
-              importedCount++;
-
-              // Afficher quelques exemples avec leur type
-              if (i <= 3) {
-                const typeLabel = locationType === '1' ? 'StopArea' : 'StopPoint';
-                console.log(`   Exemple ${i} (${typeLabel}): ${stopId} - ${row[stopNameIdx]}`);
-              }
-
-              // Log de progression tous les 1000 records
-              if (importedCount % 1000 === 0) {
-                console.log(`   Progression: ${importedCount} gares importées...`);
-              }
-            }
+          // Exécuter par batch
+          if (batchPlaceholders.length >= BATCH_SIZE) {
+            const sql = `INSERT OR IGNORE INTO stops (stop_id, stop_name, stop_lat, stop_lon, parent_station) VALUES ${batchPlaceholders.join(', ')}`;
+            await db.runAsync(sql, batchValues);
+            importedCount += batchPlaceholders.length;
+            batchValues = [];
+            batchPlaceholders = [];
           }
-          console.log('📝 Finalisation du statement...');
-        } catch (error) {
-          console.error('❌ Erreur lors de l\'exécution du statement:', error);
-          throw error;
-        } finally {
-          await stmt.finalizeAsync();
-          console.log('✅ Statement finalisé');
         }
-      });
-    } catch (error) {
-      console.error('❌ Erreur lors de la transaction:', error);
-      throw error;
-    }
+      }
 
-    console.log(`✅ ${importedCount} gares importées dans la base de données`);
+      // Insérer le dernier batch
+      if (batchPlaceholders.length > 0) {
+        const sql = `INSERT OR IGNORE INTO stops (stop_id, stop_name, stop_lat, stop_lon, parent_station) VALUES ${batchPlaceholders.join(', ')}`;
+        await db.runAsync(sql, batchValues);
+        importedCount += batchPlaceholders.length;
+      }
+    });
+
+    console.log(`✅ ${importedCount} gares importées`);
   }
 
   /**
@@ -472,6 +456,7 @@ class GTFSInitializationService {
 
   /**
    * Import des horaires (stop_times) - Le plus long !
+   * OPTIMISÉ: Import par batch de 500 rows
    */
   private async importStopTimes(db: SQLite.SQLiteDatabase): Promise<void> {
     const rows = await this.readCSVFromAssets('stop_times.txt');
@@ -484,33 +469,54 @@ class GTFSInitializationService {
     const departureTimeIdx = headers.indexOf('departure_time');
     const stopSequenceIdx = headers.indexOf('stop_sequence');
 
-    console.log(`Import de ${rows.length - 1} horaires...`);
+    const totalRows = rows.length - 1;
+    console.log(`Import de ${totalRows} horaires (optimisé par batch)...`);
+
+    // OPTIMISATION: Désactiver les contraintes temporairement pour plus de vitesse
+    await db.execAsync('PRAGMA foreign_keys = OFF;');
+    await db.execAsync('PRAGMA synchronous = OFF;');
+    await db.execAsync('PRAGMA journal_mode = MEMORY;');
+
+    const BATCH_SIZE = 500;
+    let processedRows = 0;
 
     await db.withTransactionAsync(async () => {
-      const stmt = await db.prepareAsync(
-        'INSERT OR IGNORE INTO stop_times (trip_id, stop_id, arrival_time, departure_time, stop_sequence) VALUES (?, ?, ?, ?, ?)'
-      );
+      for (let batchStart = 1; batchStart < rows.length; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, rows.length);
 
-      try {
-        for (let i = 1; i < rows.length; i++) {
+        // Construire une requête INSERT avec valeurs multiples
+        const values: any[] = [];
+        const placeholders: string[] = [];
+
+        for (let i = batchStart; i < batchEnd; i++) {
           const row = rows[i];
-          await stmt.executeAsync([
+          placeholders.push('(?, ?, ?, ?, ?)');
+          values.push(
             row[tripIdIdx],
             row[stopIdIdx],
             row[arrivalTimeIdx],
             row[departureTimeIdx],
             parseInt(row[stopSequenceIdx]) || 0
-          ]);
-
-          // Log progress every 10000 rows
-          if (i % 10000 === 0) {
-            console.log(`  ${i}/${rows.length - 1} horaires importés...`);
-          }
+          );
         }
-      } finally {
-        await stmt.finalizeAsync();
+
+        // Exécuter l'insertion en batch
+        const sql = `INSERT OR IGNORE INTO stop_times (trip_id, stop_id, arrival_time, departure_time, stop_sequence) VALUES ${placeholders.join(', ')}`;
+        await db.runAsync(sql, values);
+
+        processedRows += (batchEnd - batchStart);
+
+        // Log progress every 10000 rows
+        if (processedRows % 10000 === 0 || processedRows === totalRows) {
+          console.log(`  ${processedRows}/${totalRows} horaires importés (${Math.round(processedRows / totalRows * 100)}%)...`);
+        }
       }
     });
+
+    // Réactiver les contraintes
+    await db.execAsync('PRAGMA foreign_keys = ON;');
+    await db.execAsync('PRAGMA synchronous = NORMAL;');
+    await db.execAsync('PRAGMA journal_mode = DELETE;');
 
     console.log('✓ Horaires importés');
   }
