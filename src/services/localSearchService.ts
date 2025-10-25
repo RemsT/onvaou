@@ -5,6 +5,13 @@ import { filterStationsByLabels, countLabelMatches } from '../data/stationLabels
 import { PriceEstimationService } from './priceEstimationService';
 import { gtfsDbEnhanced } from './gtfsDatabaseServiceEnhanced';
 
+// Mode debug activé uniquement en développement
+const DEBUG_MODE = __DEV__;
+const debugLog = (...args: any[]) => {
+  if (DEBUG_MODE) console.log(...args);
+};
+const errorLog = console.error; // Les erreurs sont toujours affichées
+
 // Type pour une connexion train (compatible avec l'ancien TrainConnection)
 interface TrainConnection {
   from_station_id: string;
@@ -30,17 +37,17 @@ export class LocalSearchService {
    */
   private static async findGTFSStopId(sncfId: string): Promise<string | null> {
     try {
-      console.log(`[LocalSearchService] 🔎 Recherche GTFS pour: ${sncfId}`);
+      debugLog(`[LocalSearchService] 🔎 Recherche GTFS pour: ${sncfId}`);
 
       // Extraire le numéro à 8 chiffres du sncf_id
       const match = sncfId.match(/\d{8}/);
       if (!match) {
-        console.error(`[LocalSearchService] ❌ Impossible d'extraire le numéro SNCF de: ${sncfId}`);
+        errorLog(`[LocalSearchService] ❌ Impossible d'extraire le numéro SNCF de: ${sncfId}`);
         return null;
       }
 
       const sncfNumber = match[0];
-      console.log(`[LocalSearchService] 🔢 Numéro SNCF extrait: ${sncfNumber}`);
+      debugLog(`[LocalSearchService] 🔢 Numéro SNCF extrait: ${sncfNumber}`);
 
       // Chercher dans la base de données GTFS
       await gtfsDbEnhanced.initialize();
@@ -48,23 +55,23 @@ export class LocalSearchService {
       // Format GTFS attendu : StopArea:OCE87686006 ou StopPoint:OCE...-87686006
       // On cherche d'abord les StopArea (ce sont les gares principales)
       const stopAreaId = `StopArea:OCE${sncfNumber}`;
-      console.log(`[LocalSearchService] 🔍 Recherche de: ${stopAreaId}`);
+      debugLog(`[LocalSearchService] 🔍 Recherche de: ${stopAreaId}`);
 
       // Rechercher par nom exact d'abord
       const stopsByName = await gtfsDbEnhanced.searchStops(stopAreaId, 1);
 
       if (stopsByName.length > 0) {
-        console.log(`[LocalSearchService] ✅ Stop GTFS trouvé (exact): ${stopsByName[0].stop_id}`);
+        debugLog(`[LocalSearchService] ✅ Stop GTFS trouvé (exact): ${stopsByName[0].stop_id}`);
         return stopsByName[0].stop_id;
       }
 
       // Sinon rechercher avec juste le numéro
-      console.log(`[LocalSearchService] 🔍 Recherche alternative avec: ${sncfNumber}`);
+      debugLog(`[LocalSearchService] 🔍 Recherche alternative avec: ${sncfNumber}`);
       const stopsByNumber = await gtfsDbEnhanced.searchStops(sncfNumber, 10);
 
-      console.log(`[LocalSearchService] 📊 ${stopsByNumber.length} stops trouvés`);
+      debugLog(`[LocalSearchService] 📊 ${stopsByNumber.length} stops trouvés`);
       if (stopsByNumber.length > 0) {
-        console.log(`[LocalSearchService] 📝 Exemples: ${stopsByNumber.slice(0, 3).map(s => `${s.stop_id} (${s.stop_name})`).join(', ')}`);
+        debugLog(`[LocalSearchService] 📝 Exemples: ${stopsByNumber.slice(0, 3).map(s => `${s.stop_id} (${s.stop_name})`).join(', ')}`);
       }
 
       if (stopsByNumber.length > 0) {
@@ -73,41 +80,41 @@ export class LocalSearchService {
         const stopArea = stopsByNumber.find(s => s.stop_id.startsWith('StopArea:'));
 
         if (stopArea) {
-          console.log(`[LocalSearchService] ✅ Stop GTFS trouvé (StopArea): ${stopArea.stop_id} (${stopArea.stop_name})`);
+          debugLog(`[LocalSearchService] ✅ Stop GTFS trouvé (StopArea): ${stopArea.stop_id} (${stopArea.stop_name})`);
           return stopArea.stop_id;
         }
 
         // Si vraiment aucun StopArea, prendre le premier
-        console.log(`[LocalSearchService] ⚠️ Aucun StopArea trouvé, utilisation de: ${stopsByNumber[0].stop_id}`);
+        debugLog(`[LocalSearchService] ⚠️ Aucun StopArea trouvé, utilisation de: ${stopsByNumber[0].stop_id}`);
         return stopsByNumber[0].stop_id;
       }
 
-      console.error(`[LocalSearchService] ❌ Aucun stop GTFS trouvé pour le numéro: ${sncfNumber}`);
-      console.log(`[LocalSearchService] 🔍 Tentative de recherche par nom de gare (sncf_id peut être incorrect)...`);
+      errorLog(`[LocalSearchService] ❌ Aucun stop GTFS trouvé pour le numéro: ${sncfNumber}`);
+      debugLog(`[LocalSearchService] 🔍 Tentative de recherche par nom de gare (sncf_id peut être incorrect)...`);
 
       // FALLBACK: Chercher par nom de gare depuis frenchStations
       // Car le sncf_id dans frenchStations peut être différent du numéro dans GTFS
       const station = frenchStations.find(s => s.sncf_id === sncfNumber);
       if (station) {
-        console.log(`[LocalSearchService] 📍 Recherche par nom: "${station.name}"`);
+        debugLog(`[LocalSearchService] 📍 Recherche par nom: "${station.name}"`);
         const stopsByStationName = await gtfsDbEnhanced.searchStops(station.name, 5);
-        console.log(`[LocalSearchService] 📊 ${stopsByStationName.length} stops trouvés par nom`);
+        debugLog(`[LocalSearchService] 📊 ${stopsByStationName.length} stops trouvés par nom`);
 
         if (stopsByStationName.length > 0) {
           const stopArea = stopsByStationName.find(s => s.stop_id.startsWith('StopArea:'));
           if (stopArea) {
-            console.log(`[LocalSearchService] ✅ Stop trouvé par nom: ${stopArea.stop_id} (${stopArea.stop_name})`);
+            debugLog(`[LocalSearchService] ✅ Stop trouvé par nom: ${stopArea.stop_id} (${stopArea.stop_name})`);
             return stopArea.stop_id;
           }
-          console.log(`[LocalSearchService] ✅ Stop trouvé par nom: ${stopsByStationName[0].stop_id}`);
+          debugLog(`[LocalSearchService] ✅ Stop trouvé par nom: ${stopsByStationName[0].stop_id}`);
           return stopsByStationName[0].stop_id;
         }
       }
 
-      console.error(`[LocalSearchService] ❌ Impossible de trouver cette gare dans GTFS`);
+      errorLog(`[LocalSearchService] ❌ Impossible de trouver cette gare dans GTFS`);
       return null;
     } catch (error) {
-      console.error('[LocalSearchService] ❌ ERREUR recherche GTFS stop:', error);
+      errorLog('[LocalSearchService] ❌ ERREUR recherche GTFS stop:', error);
       return null;
     }
   }
@@ -165,7 +172,7 @@ export class LocalSearchService {
       this.stationCache.set(gtfsStopId, newStation);
       return newStation;
     } catch (error) {
-      console.error('[LocalSearchService] Erreur création station depuis GTFS:', error);
+      errorLog('[LocalSearchService] Erreur création station depuis GTFS:', error);
       this.stationCache.set(gtfsStopId, null);
       return null;
     }
@@ -272,21 +279,21 @@ export class LocalSearchService {
     timeRangeStart?: string,
     timeRangeEnd?: string
   ): Promise<SearchResult[]> {
-    console.log('========================================');
-    console.log('[LocalSearchService] 🔍 RECHERCHE DÉMARRÉE');
-    console.log(`[LocalSearchService] Gare: ${fromStation.name}`);
-    console.log(`[LocalSearchService] SNCF ID: ${fromStation.sncf_id}`);
-    console.log(`[LocalSearchService] Mode: ${mode}`);
-    console.log(`[LocalSearchService] Max Time: ${maxTime}`);
-    console.log('========================================');
+    debugLog('========================================');
+    debugLog('[LocalSearchService] 🔍 RECHERCHE DÉMARRÉE');
+    debugLog(`[LocalSearchService] Gare: ${fromStation.name}`);
+    debugLog(`[LocalSearchService] SNCF ID: ${fromStation.sncf_id}`);
+    debugLog(`[LocalSearchService] Mode: ${mode}`);
+    debugLog(`[LocalSearchService] Max Time: ${maxTime}`);
+    debugLog('========================================');
 
     // UTILISATION EXCLUSIVE DES DONNÉES GTFS
     if (!fromStation.sncf_id) {
-      console.error('[LocalSearchService] ❌ Pas de SNCF ID pour cette gare');
+      errorLog('[LocalSearchService] ❌ Pas de SNCF ID pour cette gare');
       return [];
     }
 
-    console.log('[LocalSearchService] ✓ SNCF ID présent, recherche GTFS...');
+    debugLog('[LocalSearchService] ✓ SNCF ID présent, recherche GTFS...');
 
     try {
       const gtfsResults = await this.searchWithGTFS(
@@ -299,15 +306,15 @@ export class LocalSearchService {
         timeRangeEnd
       );
 
-      console.log('========================================');
-      console.log(`[LocalSearchService] ✅ RÉSULTAT GTFS : ${gtfsResults.length} destinations`);
-      console.log('[LocalSearchService] 🎯 DURÉES RÉELLES DEPUIS HORAIRES SNCF');
-      console.log('========================================');
+      debugLog('========================================');
+      debugLog(`[LocalSearchService] ✅ RÉSULTAT GTFS : ${gtfsResults.length} destinations`);
+      debugLog('[LocalSearchService] 🎯 DURÉES RÉELLES DEPUIS HORAIRES SNCF');
+      debugLog('========================================');
 
       return gtfsResults;
     } catch (error) {
-      console.error('[LocalSearchService] ❌ ERREUR GTFS:', error);
-      console.error('[LocalSearchService] Impossible de récupérer les horaires');
+      errorLog('[LocalSearchService] ❌ ERREUR GTFS:', error);
+      errorLog('[LocalSearchService] Impossible de récupérer les horaires');
       return [];
     }
   }
@@ -324,44 +331,44 @@ export class LocalSearchService {
     timeRangeStart?: string,
     timeRangeEnd?: string
   ): Promise<SearchResult[]> {
-    console.log('[LocalSearchService] 🚂 Recherche avec horaires GTFS réels');
-    console.log(`[LocalSearchService] 📅 Filtres: maxTime=${maxTime}min, maxBudget=${maxBudget}€`);
-    console.log(`[LocalSearchService] ⏰ Plage horaire: ${timeRangeStart} - ${timeRangeEnd}`);
+    debugLog('[LocalSearchService] 🚂 Recherche avec horaires GTFS réels');
+    debugLog(`[LocalSearchService] 📅 Filtres: maxTime=${maxTime}min, maxBudget=${maxBudget}€`);
+    debugLog(`[LocalSearchService] ⏰ Plage horaire: ${timeRangeStart} - ${timeRangeEnd}`);
 
     if (!fromStation.sncf_id) {
-      console.error('[LocalSearchService] ❌ Pas de SNCF ID pour la gare de départ');
+      errorLog('[LocalSearchService] ❌ Pas de SNCF ID pour la gare de départ');
       return [];
     }
 
     try {
       // Initialiser la base de données GTFS si nécessaire
       await gtfsDbEnhanced.initialize();
-      console.log('[LocalSearchService] ✅ Base de données GTFS initialisée');
+      debugLog('[LocalSearchService] ✅ Base de données GTFS initialisée');
 
       // Convertir le SNCF ID en format GTFS
       const fromGTFSId = await this.findGTFSStopId(fromStation.sncf_id);
       if (!fromGTFSId) {
-        console.error('[LocalSearchService] ❌ Impossible de convertir SNCF ID en GTFS ID');
+        errorLog('[LocalSearchService] ❌ Impossible de convertir SNCF ID en GTFS ID');
         return [];
       }
 
-      console.log(`[LocalSearchService] ✓ GTFS ID de départ: ${fromGTFSId}`);
+      debugLog(`[LocalSearchService] ✓ GTFS ID de départ: ${fromGTFSId}`);
 
       // Utiliser l'heure de début de plage ou l'heure actuelle
       const departureTime = timeRangeStart || new Date().toTimeString().slice(0, 8);
-      console.log(`[LocalSearchService] 🕐 Heure de départ: ${departureTime}`);
+      debugLog(`[LocalSearchService] 🕐 Heure de départ: ${departureTime}`);
 
       // 🚀 RECHERCHE OPTIMISÉE BULK: Connexions directes + correspondances
-      console.log('[LocalSearchService] 🚀 Recherche BULK destinations (direct + correspondances)...');
+      debugLog('[LocalSearchService] 🚀 Recherche BULK destinations (direct + correspondances)...');
       const searchStartTime = Date.now();
 
       // Map pour stocker la meilleure connexion par destination
       const bestConnectionByDestination = new Map<string, TrainConnection>();
 
       // 1️⃣ CONNEXIONS DIRECTES (sans changement)
-      console.log('[LocalSearchService] 📍 Étape 1/2: Connexions directes...');
-      console.log(`[LocalSearchService] 🔍 Recherche depuis: ${fromGTFSId}`);
-      console.log(`[LocalSearchService] 🕐 Plage horaire: ${departureTime} - ${timeRangeEnd}`);
+      debugLog('[LocalSearchService] 📍 Étape 1/2: Connexions directes...');
+      debugLog(`[LocalSearchService] 🔍 Recherche depuis: ${fromGTFSId}`);
+      debugLog(`[LocalSearchService] 🕐 Plage horaire: ${departureTime} - ${timeRangeEnd}`);
       const step1Start = Date.now();
       const directConnections = await gtfsDbEnhanced.findAllDestinationsFrom(
         fromGTFSId,
@@ -370,7 +377,7 @@ export class LocalSearchService {
         2000
       );
       const step1Time = Date.now() - step1Start;
-      console.log(`[LocalSearchService] ✅ ${directConnections.length} connexions directes (${step1Time}ms)`);
+      debugLog(`[LocalSearchService] ✅ ${directConnections.length} connexions directes (${step1Time}ms)`);
 
       if (directConnections.length === 0) {
         console.warn('[LocalSearchService] ⚠️ AUCUNE connexion directe trouvée! Vérifiez:');
@@ -398,7 +405,7 @@ export class LocalSearchService {
       }
 
       // 2️⃣ TRAJETS AVEC 1 CORRESPONDANCE - BULK OPTIMISÉ
-      console.log('[LocalSearchService] 🔄 Étape 2/2: Trajets avec 1 correspondance (BULK)...');
+      debugLog('[LocalSearchService] 🔄 Étape 2/2: Trajets avec 1 correspondance (BULK)...');
       const step2Start = Date.now();
       const oneTransferMap = await gtfsDbEnhanced.findAllDestinationsWithOneTransfer(
         fromGTFSId,
@@ -409,7 +416,7 @@ export class LocalSearchService {
         maxTime // Même limite de temps que pour les trajets directs
       );
       const step2Time = Date.now() - step2Start;
-      console.log(`[LocalSearchService] ✅ ${oneTransferMap.size} destinations avec 1 correspondance (${step2Time}ms)`);
+      debugLog(`[LocalSearchService] ✅ ${oneTransferMap.size} destinations avec 1 correspondance (${step2Time}ms)`);
 
       // Ajouter TOUTES les destinations avec 1 correspondance
       // Cela inclut les destinations sans trajet direct ET celles avec un trajet direct plus lent
@@ -466,13 +473,13 @@ export class LocalSearchService {
         }
       }
 
-      console.log(`[LocalSearchService] 📊 Correspondances: ${transfersAdded} ajoutées, ${transfersReplaced} remplacent un direct, ${transfersSkipped} ignorées (direct plus rapide)`);
+      debugLog(`[LocalSearchService] 📊 Correspondances: ${transfersAdded} ajoutées, ${transfersReplaced} remplacent un direct, ${transfersSkipped} ignorées (direct plus rapide)`);
 
-      console.log(`[LocalSearchService] 📊 ${bestConnectionByDestination.size} destinations uniques trouvées`);
+      debugLog(`[LocalSearchService] 📊 ${bestConnectionByDestination.size} destinations uniques trouvées`);
 
       // DEBUG: Afficher quelques destinations trouvées
       const sampleDests = Array.from(bestConnectionByDestination.keys()).slice(0, 10);
-      console.log(`[LocalSearchService] 🔍 Exemples de destinations: ${sampleDests.map(d => d.slice(-8)).join(', ')}`);
+      debugLog(`[LocalSearchService] 🔍 Exemples de destinations: ${sampleDests.map(d => d.slice(-8)).join(', ')}`);
 
       // Convertir la Map en array
       const connections: TrainConnection[] = Array.from(bestConnectionByDestination.values());
@@ -488,17 +495,17 @@ export class LocalSearchService {
       }>();
 
       // 🚀 OPTIMISATION: Pré-charger TOUTES les stations en PARALLÈLE
-      console.log('[LocalSearchService] ⚡ Pré-chargement des stations en parallèle...');
+      debugLog('[LocalSearchService] ⚡ Pré-chargement des stations en parallèle...');
       const step3Start = Date.now();
       const uniqueStopIds = [...new Set(connections.map(c => c.to_station_id))];
-      console.log(`[LocalSearchService] 📍 ${uniqueStopIds.length} stations uniques à charger`);
+      debugLog(`[LocalSearchService] 📍 ${uniqueStopIds.length} stations uniques à charger`);
 
       // Charger toutes les stations en parallèle (beaucoup plus rapide)
       await Promise.all(
         uniqueStopIds.map(stopId => this.findStationByGTFSId(stopId))
       );
       const step3Time = Date.now() - step3Start;
-      console.log(`[LocalSearchService] ✅ Stations pré-chargées dans le cache (${step3Time}ms)`);
+      debugLog(`[LocalSearchService] ✅ Stations pré-chargées dans le cache (${step3Time}ms)`);
 
       // Compteurs de filtrage
       let filteredStationNotFound = 0;
@@ -515,7 +522,7 @@ export class LocalSearchService {
       for (const conn of connections) {
         // DEBUG: Afficher les premières correspondances pour vérifier
         if (conn.transfers && conn.transfers > 0 && filteredDuration < 3) {
-          console.log(`[LocalSearchService] 🔍 DEBUG Correspondance: ${conn.to_station_id}, durée=${conn.duration_minutes}min, transfers=${conn.transfers}, station=${conn.transferStation}`);
+          debugLog(`[LocalSearchService] 🔍 DEBUG Correspondance: ${conn.to_station_id}, durée=${conn.duration_minutes}min, transfers=${conn.transfers}, station=${conn.transferStation}`);
         }
 
         // Récupérer la station depuis le cache (instantané)
@@ -523,7 +530,7 @@ export class LocalSearchService {
         if (!toStation) {
           filteredStationNotFound++;
           if (conn.transfers && conn.transfers > 0) {
-            console.log(`[LocalSearchService] ⚠️ Station non trouvée pour correspondance: ${conn.to_station_id}`);
+            debugLog(`[LocalSearchService] ⚠️ Station non trouvée pour correspondance: ${conn.to_station_id}`);
           }
           continue;
         }
@@ -541,7 +548,7 @@ export class LocalSearchService {
         if (fromCityName === toCityName) {
           filteredSameCity++;
           if (conn.transfers && conn.transfers > 0) {
-            console.log(`[LocalSearchService] ⚠️ Correspondance éliminée (même ville): ${fromStation.name} → ${toStation.name} via ${conn.transferStation}`);
+            debugLog(`[LocalSearchService] ⚠️ Correspondance éliminée (même ville): ${fromStation.name} → ${toStation.name} via ${conn.transferStation}`);
           }
           continue;
         }
@@ -619,13 +626,13 @@ export class LocalSearchService {
         dest => dest.connection.transfers && dest.connection.transfers > 0
       ).length;
 
-      console.log(`[LocalSearchService] 🎯 ${destinationsMap.size} destinations après filtrage (dont ${destinationsWithTransfers} avec correspondances)`);
-      console.log(`[LocalSearchService] ❌ ${connections.length - destinationsMap.size} destinations éliminées:`);
-      console.log(`  - Station non trouvée: ${filteredStationNotFound}`);
-      console.log(`  - Même ville: ${filteredSameCity}`);
-      console.log(`  - Hors plage horaire: ${filteredTimeRange}`);
-      console.log(`  - Durée trop longue: ${filteredDuration} (dont ${filteredDurationWithTransfers} avec correspondances)`);
-      console.log(`  - Prix trop élevé: ${filteredPrice}`);
+      debugLog(`[LocalSearchService] 🎯 ${destinationsMap.size} destinations après filtrage (dont ${destinationsWithTransfers} avec correspondances)`);
+      debugLog(`[LocalSearchService] ❌ ${connections.length - destinationsMap.size} destinations éliminées:`);
+      debugLog(`  - Station non trouvée: ${filteredStationNotFound}`);
+      debugLog(`  - Même ville: ${filteredSameCity}`);
+      debugLog(`  - Hors plage horaire: ${filteredTimeRange}`);
+      debugLog(`  - Durée trop longue: ${filteredDuration} (dont ${filteredDurationWithTransfers} avec correspondances)`);
+      debugLog(`  - Prix trop élevé: ${filteredPrice}`);
 
       // Convertir en SearchResult[]
       // OPTIMISATION: Utilise les distances et prix déjà calculés (pas de recalcul)
@@ -695,12 +702,12 @@ export class LocalSearchService {
       }
 
       const totalTime = Date.now() - searchStartTime;
-      console.log(`[LocalSearchService] ✅ ${results.length} destinations finales retournées`);
-      console.log(`[LocalSearchService] ⏱️ Temps total de recherche: ${totalTime}ms`);
+      debugLog(`[LocalSearchService] ✅ ${results.length} destinations finales retournées`);
+      debugLog(`[LocalSearchService] ⏱️ Temps total de recherche: ${totalTime}ms`);
 
       return results;
     } catch (error) {
-      console.error('[LocalSearchService] ❌ Erreur recherche GTFS:', error);
+      errorLog('[LocalSearchService] ❌ Erreur recherche GTFS:', error);
       return [];
     }
   }

@@ -9,6 +9,13 @@ import * as SQLite from 'expo-sqlite';
 // Utiliser l'API legacy d'Expo FileSystem (compatible avec SDK 54+)
 import * as FileSystem from 'expo-file-system/legacy';
 
+// Mode debug activé uniquement en développement
+const DEBUG_MODE = __DEV__;
+const debugLog = (...args: any[]) => {
+  if (DEBUG_MODE) console.log(...args);
+};
+const errorLog = console.error;
+
 export interface Stop {
   stop_id: string;
   stop_name: string;
@@ -67,9 +74,9 @@ class GTFSDatabaseServiceEnhanced {
     if (this.db) {
       try {
         await this.db.closeAsync();
-        console.log('✅ Connexion GTFS fermée');
+        debugLog('✅ Connexion GTFS fermée');
       } catch (error) {
-        console.error('Erreur lors de la fermeture de la connexion GTFS:', error);
+        errorLog('Erreur lors de la fermeture de la connexion GTFS:', error);
       }
       this.db = null;
       this.initialized = false;
@@ -100,7 +107,7 @@ class GTFSDatabaseServiceEnhanced {
       // Ouvrir la base de données existante
       this.db = await SQLite.openDatabaseAsync('gtfs.db');
       this.initialized = true;
-      console.log('✅ Base de données GTFS initialisée');
+      debugLog('✅ Base de données GTFS initialisée');
 
       // Vérifier que la vue direct_connections existe et contient des données
       const viewExists = await this.db.getAllAsync<any>(
@@ -108,13 +115,13 @@ class GTFSDatabaseServiceEnhanced {
       );
 
       if (viewExists.length === 0) {
-        console.error('❌ PROBLÈME: La vue direct_connections n\'existe pas !');
-        console.log('🔧 Création automatique de la vue direct_connections...');
+        errorLog('❌ PROBLÈME: La vue direct_connections n\'existe pas !');
+        debugLog('🔧 Création automatique de la vue direct_connections...');
 
         // Créer la vue automatiquement
         await this.createDirectConnectionsView();
 
-        console.log('✅ Vue direct_connections créée avec succès');
+        debugLog('✅ Vue direct_connections créée avec succès');
       }
 
       // Vérifier le contenu de la vue (que ce soit une vue existante ou nouvellement créée)
@@ -122,14 +129,14 @@ class GTFSDatabaseServiceEnhanced {
         `SELECT COUNT(*) as count FROM direct_connections LIMIT 1`
       );
 
-      console.log(`📊 Nombre de connexions dans direct_connections: ${count?.count || 0}`);
+      debugLog(`📊 Nombre de connexions dans direct_connections: ${count?.count || 0}`);
 
       if (count && count.count > 0) {
         // Afficher un exemple de connexion
         const example = await this.db.getFirstAsync<any>(
           `SELECT from_stop_id, to_stop_id, departure_time FROM direct_connections LIMIT 1`
         );
-        console.log(`📌 Exemple de connexion: ${example?.from_stop_id} -> ${example?.to_stop_id} à ${example?.departure_time}`);
+        debugLog(`📌 Exemple de connexion: ${example?.from_stop_id} -> ${example?.to_stop_id} à ${example?.departure_time}`);
 
         // Afficher les types de trains dans la base
         const routeTypes = await this.db.getAllAsync<any>(
@@ -139,17 +146,17 @@ class GTFSDatabaseServiceEnhanced {
            ORDER BY count DESC
            LIMIT 10`
         );
-        console.log(`🚂 Types de trains dans la base GTFS:`);
+        debugLog(`🚂 Types de trains dans la base GTFS:`);
         routeTypes.forEach(rt => {
-          console.log(`   ${rt.route_short_name || 'N/A'}: ${rt.count} routes`);
+          debugLog(`   ${rt.route_short_name || 'N/A'}: ${rt.count} routes`);
         });
       } else {
-        console.error('❌ PROBLÈME: La vue direct_connections est VIDE !');
-        console.error('💡 Les tables sous-jacentes (stop_times, trips, routes, stops) sont probablement vides');
-        console.error('💡 Solution: Réinitialiser la base de données GTFS complètement');
+        errorLog('❌ PROBLÈME: La vue direct_connections est VIDE !');
+        errorLog('💡 Les tables sous-jacentes (stop_times, trips, routes, stops) sont probablement vides');
+        errorLog('💡 Solution: Réinitialiser la base de données GTFS complètement');
       }
     } catch (error) {
-      console.error('❌ Erreur lors de l\'initialisation de la DB GTFS:', error);
+      errorLog('❌ Erreur lors de l\'initialisation de la DB GTFS:', error);
       throw error;
     }
   }
@@ -204,7 +211,7 @@ class GTFSDatabaseServiceEnhanced {
       throw new Error('Database not initialized');
     }
 
-    console.log('🚀 Création des index d\'optimisation...');
+    debugLog('🚀 Création des index d\'optimisation...');
 
     // Index pour les recherches sur stops avec parent_station
     await this.db.execAsync(`
@@ -220,7 +227,7 @@ class GTFSDatabaseServiceEnhanced {
       CREATE INDEX IF NOT EXISTS idx_stop_times_stop_dep_time ON stop_times(stop_id, departure_time);
     `);
 
-    console.log('✅ Index d\'optimisation créés');
+    debugLog('✅ Index d\'optimisation créés');
   }
 
   /**
@@ -299,7 +306,7 @@ class GTFSDatabaseServiceEnhanced {
     );
 
     if (viewCheck.length === 0) {
-      console.error('❌ La vue direct_connections n\'existe pas !');
+      errorLog('❌ La vue direct_connections n\'existe pas !');
       return [];
     }
 
@@ -369,9 +376,9 @@ class GTFSDatabaseServiceEnhanced {
     query += ` ORDER BY dc.to_stop_id, dc.departure_time LIMIT ?`;
     params.push(limit);
 
-    console.log(`[findAllDestinationsFrom] 🚀 Recherche BULK de toutes les destinations depuis ${fromStopId}`);
+    debugLog(`[findAllDestinationsFrom] 🚀 Recherche BULK de toutes les destinations depuis ${fromStopId}`);
     const result = await this.db.getAllAsync<Connection>(query, params);
-    console.log(`[findAllDestinationsFrom] ✅ ${result.length} connexions trouvées`);
+    debugLog(`[findAllDestinationsFrom] ✅ ${result.length} connexions trouvées`);
 
     return result;
   }
@@ -392,7 +399,7 @@ class GTFSDatabaseServiceEnhanced {
       throw new Error('Database not initialized');
     }
 
-    console.log(`[findAllDestinationsWithOneTransfer] 🔄 Recherche BULK avec 1 correspondance depuis ${fromStopId}`);
+    debugLog(`[findAllDestinationsWithOneTransfer] 🔄 Recherche BULK avec 1 correspondance depuis ${fromStopId}`);
 
     const query = `
       SELECT
@@ -449,33 +456,33 @@ class GTFSDatabaseServiceEnhanced {
     if (maxTotalDuration) params.push(maxTotalDuration);
     params.push(limit);
 
-    console.log(`[findAllDestinationsWithOneTransfer] 📝 Paramètres: fromStopId=${fromStopId}, timeMin=${departureTimeMin}, timeMax=${departureTimeMax}, maxWait=${maxWaitMinutes}, maxTotalDuration=${maxTotalDuration || 'N/A'}, limit=${limit}`);
+    debugLog(`[findAllDestinationsWithOneTransfer] 📝 Paramètres: fromStopId=${fromStopId}, timeMin=${departureTimeMin}, timeMax=${departureTimeMax}, maxWait=${maxWaitMinutes}, maxTotalDuration=${maxTotalDuration || 'N/A'}, limit=${limit}`);
 
     // DEBUG: Vérifier si la vue direct_connections existe et contient des données
     try {
       const countResult = await this.db.getAllAsync<any>('SELECT COUNT(*) as count FROM direct_connections LIMIT 1');
-      console.log(`[findAllDestinationsWithOneTransfer] 📊 Nombre de lignes dans direct_connections: ${countResult[0]?.count || 0}`);
+      debugLog(`[findAllDestinationsWithOneTransfer] 📊 Nombre de lignes dans direct_connections: ${countResult[0]?.count || 0}`);
     } catch (error) {
-      console.error(`[findAllDestinationsWithOneTransfer] ❌ Erreur en vérifiant direct_connections:`, error);
+      errorLog(`[findAllDestinationsWithOneTransfer] ❌ Erreur en vérifiant direct_connections:`, error);
     }
 
     const results = await this.db.getAllAsync<any>(query, params);
-    console.log(`[findAllDestinationsWithOneTransfer] ✅ ${results.length} trajets avec correspondance trouvés`);
+    debugLog(`[findAllDestinationsWithOneTransfer] ✅ ${results.length} trajets avec correspondance trouvés`);
 
     // DEBUG: Afficher quelques exemples si trouvés
     if (results.length > 0) {
-      console.log(`[findAllDestinationsWithOneTransfer] 🔍 Exemples:`, results.slice(0, 3).map(r => `${r.destination_name} via ${r.transfer_station}`));
+      debugLog(`[findAllDestinationsWithOneTransfer] 🔍 Exemples:`, results.slice(0, 3).map(r => `${r.destination_name} via ${r.transfer_station}`));
     }
 
     // DEBUG: Vérifier si Annecy est dans les résultats
     const annecyResults = results.filter(r => r.destination_name && r.destination_name.toLowerCase().includes('annecy'));
     if (annecyResults.length > 0) {
-      console.log(`[findAllDestinationsWithOneTransfer] 🎯 Annecy trouvé: ${annecyResults.length} trajets`);
+      debugLog(`[findAllDestinationsWithOneTransfer] 🎯 Annecy trouvé: ${annecyResults.length} trajets`);
       annecyResults.forEach(r => {
-        console.log(`   → ${r.destination_name} via ${r.transfer_station}, durée: ${r.total_duration_minutes}min`);
+        debugLog(`   → ${r.destination_name} via ${r.transfer_station}, durée: ${r.total_duration_minutes}min`);
       });
     } else {
-      console.log(`[findAllDestinationsWithOneTransfer] ⚠️ Annecy NOT FOUND dans les 2000 résultats SQL`);
+      debugLog(`[findAllDestinationsWithOneTransfer] ⚠️ Annecy NOT FOUND dans les 2000 résultats SQL`);
     }
 
     // Regrouper par destination (garder seulement le meilleur par destination)
@@ -503,7 +510,7 @@ class GTFSDatabaseServiceEnhanced {
       } as any);
     }
 
-    console.log(`[findAllDestinationsWithOneTransfer] 📍 ${destinationMap.size} destinations uniques`);
+    debugLog(`[findAllDestinationsWithOneTransfer] 📍 ${destinationMap.size} destinations uniques`);
     return destinationMap;
   }
 
@@ -794,7 +801,7 @@ class GTFSDatabaseServiceEnhanced {
     const allJourneys: JourneyWithTransfer[] = [];
 
     // 1. Connexions directes
-    console.log('Recherche de connexions directes...');
+    debugLog('Recherche de connexions directes...');
     const directConnections = await this.findDirectConnections(
       fromStopId,
       toStopId,
@@ -811,7 +818,7 @@ class GTFSDatabaseServiceEnhanced {
 
     // 2. Avec 1 correspondance
     if (maxTransfers >= 1) {
-      console.log('Recherche avec 1 correspondance...');
+      debugLog('Recherche avec 1 correspondance...');
       const oneTransfer = await this.findJourneyWithOneTransfer(
         fromStopId,
         toStopId,
@@ -824,7 +831,7 @@ class GTFSDatabaseServiceEnhanced {
 
     // 3. Avec 2 correspondances (seulement si pas assez de résultats)
     if (maxTransfers >= 2 && allJourneys.length < 5) {
-      console.log('Recherche avec 2 correspondances...');
+      debugLog('Recherche avec 2 correspondances...');
       const twoTransfers = await this.findJourneyWithTwoTransfers(
         fromStopId,
         toStopId,
