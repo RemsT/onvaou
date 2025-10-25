@@ -19,15 +19,18 @@ export type RootStackParamList = {
     results: SearchResult[];
     mode: 'time' | 'budget' | 'both';
     maxValue?: number;
+    searchDate?: number; // timestamp
   };
   MapView: {
     fromStation: Station;
     results: SearchResult[];
     mode: 'time' | 'budget' | 'both';
     maxValue?: number;
+    searchDate?: number; // timestamp
   };
   DestinationDetail: {
     destination: SearchResult;
+    searchDate?: number; // timestamp
   };
 };
 

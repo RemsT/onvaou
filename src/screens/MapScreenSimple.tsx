@@ -21,7 +21,7 @@ export default function MapScreen() {
   const navigation = useNavigation<MapScreenNavigationProp>();
   const mapRef = useRef<MapView>(null);
 
-  const { fromStation, results, mode, maxValue } = route.params;
+  const { fromStation, results, mode, maxValue, searchDate } = route.params;
 
   // Calculer la région initiale pour centrer la carte
   const initialRegion = {
@@ -123,6 +123,7 @@ export default function MapScreen() {
                 onPress={() => {
                   navigation.navigate('DestinationDetail', {
                     destination: result,
+                    searchDate,
                   });
                 }}
                 style={styles.callout}

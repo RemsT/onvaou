@@ -9,6 +9,7 @@ import {
   Alert,
   Dimensions,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
@@ -26,7 +27,7 @@ const { width } = Dimensions.get('window');
 export default function DestinationDetailScreen() {
   const route = useRoute<DestinationDetailRouteProp>();
   const navigation = useNavigation<DestinationDetailNavigationProp>();
-  const { destination } = route.params;
+  const { destination, searchDate } = route.params;
   const [mapReady, setMapReady] = useState(false);
 
   /**
@@ -78,15 +79,64 @@ export default function DestinationDetailScreen() {
     }
   };
 
-  const handleBooking = (platform: 'sncf' | 'trainline') => {
-    const url = buildBookingURL(platform);
+  const handleBooking = async (platform: 'sncf' | 'trainline') => {
+    // Si c'est SNCF Connect, copier d'abord dans le presse-papier
+    if (platform === 'sncf') {
+      const fromStation = destination.from_station;
+      const toStation = destination.to_station;
 
-    console.log(`Opening ${platform} with URL:`, url);
+      // Utiliser la date et l'heure du train
+      const trainDepartureTime = new Date(destination.departure_time);
 
-    Linking.openURL(url).catch((error) => {
-      console.error('Error opening URL:', error);
-      Alert.alert('Erreur', "Impossible d'ouvrir le lien");
-    });
+      // Arrondir à l'heure inférieure
+      const roundedHour = trainDepartureTime.getHours();
+      const timeStr = `${roundedHour.toString().padStart(2, '0')}:00`;
+
+      // Format de date: JJ/MM/AAAA
+      const day = trainDepartureTime.getDate().toString().padStart(2, '0');
+      const month = (trainDepartureTime.getMonth() + 1).toString().padStart(2, '0');
+      const year = trainDepartureTime.getFullYear();
+      const dateStr = `${day}/${month}/${year}`;
+
+      const fromName = fromStation ? fromStation.name : '';
+      const toName = toStation.name;
+
+      // Construire le texte à copier: depart de {gare depart}, arrivee a {gare d'arrivee} le {date} a partir de {heure}
+      const textToCopy = `depart de ${fromName}, arrivee a ${toName} le ${dateStr} a partir de ${timeStr}`;
+
+      try {
+        await Clipboard.setStringAsync(textToCopy);
+
+        // Afficher la confirmation et ouvrir SNCF Connect
+        Alert.alert(
+          'Copié !',
+          'SNCF Connect va s\'ouvrir! Collez les informations dans la barre de recherche.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                const url = buildBookingURL(platform);
+                Linking.openURL(url).catch((error) => {
+                  console.error('Error opening URL:', error);
+                  Alert.alert('Erreur', "Impossible d'ouvrir le lien");
+                });
+              }
+            }
+          ]
+        );
+      } catch (error) {
+        console.error('Error copying to clipboard:', error);
+        Alert.alert('Erreur', 'Impossible de copier dans le presse-papier');
+      }
+    } else {
+      // Pour Trainline, comportement normal
+      const url = buildBookingURL(platform);
+      console.log(`Opening ${platform} with URL:`, url);
+      Linking.openURL(url).catch((error) => {
+        console.error('Error opening URL:', error);
+        Alert.alert('Erreur', "Impossible d'ouvrir le lien");
+      });
+    }
   };
 
   // Calculer la région de la carte pour afficher tous les points
@@ -143,10 +193,11 @@ export default function DestinationDetailScreen() {
     };
   };
 
+  // Utiliser directement les timestamps ISO des horaires
   const departureTime = new Date(destination.departure_time);
-  const arrivalTime = new Date(
-    departureTime.getTime() + destination.duration * 60000
-  );
+  const arrivalTime = destination.arrival_time
+    ? new Date(destination.arrival_time)
+    : new Date(departureTime.getTime() + destination.duration * 60000);
 
   return (
     <ScrollView style={styles.container}>
@@ -181,6 +232,7 @@ export default function DestinationDetailScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
             Horaires pour le {departureTime.toLocaleDateString('fr-FR', {
+              weekday: 'long',
               day: 'numeric',
               month: 'long'
             })}
@@ -289,6 +341,7 @@ export default function DestinationDetailScreen() {
         {/* Réservation */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Réserver</Text>
+
           <TouchableOpacity
             style={styles.bookingButton}
             onPress={() => handleBooking('sncf')}

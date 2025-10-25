@@ -47,12 +47,18 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
       day: 'numeric',
       month: 'short'
     };
-    return date.toLocaleDateString('fr-FR', options);
+    // Enlever les points des abréviations (ven. -> ven, oct. -> oct)
+    return date.toLocaleDateString('fr-FR', options).replace(/\./g, '');
   };
 
   const formatTime = (date: Date): string => {
     const hours = date.getHours().toString().padStart(2, '0');
     return `${hours}:00`;
+  };
+
+  const formatTimeRange = (time: string): string => {
+    // Convertir 08:00 en 08h00
+    return time.replace(':', 'h');
   };
 
   const formatMonthYear = (date: Date): string => {
@@ -427,7 +433,7 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
             </View>
             <View style={styles.dateTimeRow}>
               <Text style={styles.dateTimeLabel}>Intervalle:</Text>
-              <Text style={styles.dateTimeValue}>{timeRangeStart} - {timeRangeEnd}</Text>
+              <Text style={styles.dateTimeValue}>{formatTimeRange(timeRangeStart)} - {formatTimeRange(timeRangeEnd)}</Text>
             </View>
           </View>
           <TouchableOpacity
@@ -502,8 +508,8 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
                     <Text style={styles.previewLabel}>Intervalle de temps</Text>
                     <Text style={styles.previewValue}>
                       {isTimeRangeValid()
-                        ? `${tempTimeRangeStart} - ${tempTimeRangeEnd}`
-                        : `${tempTimeRangeStart} - `
+                        ? `${formatTimeRange(tempTimeRangeStart)} - ${formatTimeRange(tempTimeRangeEnd)}`
+                        : `${formatTimeRange(tempTimeRangeStart)} - `
                       }
                     </Text>
                   </View>
@@ -572,13 +578,13 @@ const styles = StyleSheet.create({
   dateTimeLabel: {
     fontSize: 13,
     color: '#5F6368',
-    fontWeight: '500',
+    fontWeight: '600',
     marginRight: 6,
     width: 60,
   },
   dateTimeValue: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#0C3823',
   },
   modifyButton: {

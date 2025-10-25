@@ -58,6 +58,6 @@ export class HybridSearchService {
   ): Promise<SearchResult[]> {
     // Utilisation des données locales uniquement (APIs désactivées temporairement)
     console.log('Utilisation des données locales avec estimation des prix');
-    return LocalSearchService.searchDestinations(fromStation, mode, maxTime, maxBudget, selectedLabels, timeRangeStart, timeRangeEnd);
+    return LocalSearchService.searchDestinations(fromStation, mode, maxTime, maxBudget, selectedLabels, timeRangeStart, timeRangeEnd, datetime);
   }
 }

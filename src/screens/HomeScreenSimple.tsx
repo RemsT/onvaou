@@ -45,10 +45,8 @@ export default function HomeScreen() {
   const [showBudgetPickerModal, setShowBudgetPickerModal] = useState(false);
   const [timeRangeStart, setTimeRangeStart] = useState<string>('08:00');
   const [timeRangeEnd, setTimeRangeEnd] = useState<string>('20:00');
-  // Checkboxes pour les correspondances (par défaut toutes cochées)
-  const [showDirect, setShowDirect] = useState(true);
-  const [show1Transfer, setShow1Transfer] = useState(true);
-  const [show2Transfers, setShow2Transfers] = useState(true);
+  // Checkbox pour les correspondances (par défaut cochée)
+  const [includeTransfers, setIncludeTransfers] = useState(true);
   // État pour l'initialisation de la base de données
   const [isInitializing, setIsInitializing] = useState(false);
   const [initProgress, setInitProgress] = useState<InitializationProgress>({
@@ -159,11 +157,10 @@ export default function HomeScreen() {
       const filteredResults = results.filter((result) => {
         const transfers = result.transfers ?? 0; // 0 si undefined
 
-        if (transfers === 0 && showDirect) return true;
-        if (transfers === 1 && show1Transfer) return true;
-        if (transfers === 2 && show2Transfers) return true;
-
-        return false;
+        // Si includeTransfers est coché: afficher tout (direct + correspondances)
+        // Si non coché: afficher uniquement les trajets directs
+        if (includeTransfers) return true;
+        return transfers === 0;
       });
 
       navigation.navigate('ResultsList', {
@@ -171,6 +168,7 @@ export default function HomeScreen() {
         results: filteredResults,
         mode: searchMode,
         maxValue: timeValue || budgetValue,
+        searchDate: (selectedDate || new Date()).getTime(),
       });
     } catch (error) {
       Alert.alert('Erreur', 'Impossible de récupérer les destinations');
@@ -387,7 +385,8 @@ export default function HomeScreen() {
             style={[
               styles.filterRow,
               enableBudgetFilter && styles.filterRowActive,
-              loading && styles.filterRowDisabled
+              loading && styles.filterRowDisabled,
+              { marginBottom: 0 }
             ]}
           >
             <TouchableOpacity
@@ -420,61 +419,30 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {/* Filtre de correspondances - 3 checkboxes sur la même ligne */}
-          <View style={[
-            styles.transfersFilterSection,
-            loading && styles.filterRowDisabled
-          ]}>
-            <Text style={styles.cardTitle}>Correspondances</Text>
-            <View style={styles.transfersCheckboxRowHorizontal}>
-              {/* 0 correspondance (Direct) */}
-              <TouchableOpacity
-                style={styles.transfersCheckboxItem}
-                onPress={() => setShowDirect(!showDirect)}
-                activeOpacity={0.7}
-                disabled={loading}
-              >
-                <View style={[
-                  styles.customCheckbox,
-                  showDirect && styles.customCheckboxActive
-                ]}>
-                  {showDirect && <Text style={styles.checkmark}>✓</Text>}
-                </View>
-                <Text style={styles.transfersCheckboxLabelInline}>0</Text>
-              </TouchableOpacity>
-
-              {/* 1 correspondance */}
-              <TouchableOpacity
-                style={styles.transfersCheckboxItem}
-                onPress={() => setShow1Transfer(!show1Transfer)}
-                activeOpacity={0.7}
-                disabled={loading}
-              >
-                <View style={[
-                  styles.customCheckbox,
-                  show1Transfer && styles.customCheckboxActive
-                ]}>
-                  {show1Transfer && <Text style={styles.checkmark}>✓</Text>}
-                </View>
-                <Text style={styles.transfersCheckboxLabelInline}>1</Text>
-              </TouchableOpacity>
-
-              {/* 2 correspondances */}
-              <TouchableOpacity
-                style={styles.transfersCheckboxItem}
-                onPress={() => setShow2Transfers(!show2Transfers)}
-                activeOpacity={0.7}
-                disabled={loading}
-              >
-                <View style={[
-                  styles.customCheckbox,
-                  show2Transfers && styles.customCheckboxActive
-                ]}>
-                  {show2Transfers && <Text style={styles.checkmark}>✓</Text>}
-                </View>
-                <Text style={styles.transfersCheckboxLabelInline}>2</Text>
-              </TouchableOpacity>
-            </View>
+          {/* Correspondances */}
+          <View
+            style={[
+              styles.filterRow,
+              loading && styles.filterRowDisabled,
+              { marginTop: 0 }
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.filterLeftSection}
+              onPress={() => setIncludeTransfers(!includeTransfers)}
+              activeOpacity={0.7}
+              disabled={loading}
+            >
+              <View style={[
+                styles.customCheckbox,
+                includeTransfers && styles.customCheckboxActive
+              ]}>
+                {includeTransfers && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <View style={styles.filterTextContainer}>
+                <Text style={styles.filterLabel}>Correspondances</Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
 

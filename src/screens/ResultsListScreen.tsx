@@ -23,7 +23,7 @@ export default function ResultsListScreen() {
   const route = useRoute<ResultsListRouteProp>();
   const navigation = useNavigation<ResultsListNavigationProp>();
 
-  const { fromStation, results, mode, maxValue } = route.params;
+  const { fromStation, results, mode, maxValue, searchDate } = route.params;
   const [sortType, setSortType] = useState<SortType>('duration');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
@@ -55,7 +55,10 @@ export default function ResultsListScreen() {
   });
 
   const handleDestinationPress = (destination: SearchResult) => {
-    navigation.navigate('DestinationDetail', { destination });
+    navigation.navigate('DestinationDetail', {
+      destination,
+      searchDate
+    });
   };
 
   const handleViewMap = () => {
@@ -65,6 +68,7 @@ export default function ResultsListScreen() {
       results: sortedResults,
       mode,
       maxValue,
+      searchDate,
     });
   };
 

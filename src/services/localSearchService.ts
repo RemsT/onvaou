@@ -277,7 +277,8 @@ export class LocalSearchService {
     maxBudget?: number,
     selectedLabels?: CityLabel[],
     timeRangeStart?: string,
-    timeRangeEnd?: string
+    timeRangeEnd?: string,
+    searchDate?: Date
   ): Promise<SearchResult[]> {
     debugLog('========================================');
     debugLog('[LocalSearchService] 🔍 RECHERCHE DÉMARRÉE');
@@ -303,7 +304,8 @@ export class LocalSearchService {
         maxBudget,
         selectedLabels,
         timeRangeStart,
-        timeRangeEnd
+        timeRangeEnd,
+        searchDate
       );
 
       debugLog('========================================');
@@ -329,7 +331,8 @@ export class LocalSearchService {
     maxBudget?: number,
     selectedLabels?: CityLabel[],
     timeRangeStart?: string,
-    timeRangeEnd?: string
+    timeRangeEnd?: string,
+    searchDate?: Date
   ): Promise<SearchResult[]> {
     debugLog('[LocalSearchService] 🚂 Recherche avec horaires GTFS réels');
     debugLog(`[LocalSearchService] 📅 Filtres: maxTime=${maxTime}min, maxBudget=${maxBudget}€`);
@@ -639,7 +642,7 @@ export class LocalSearchService {
       let results: SearchResult[] = Array.from(destinationsMap.values()).map(({ connection, station, distance, priceEstimate }) => {
 
         // Créer un datetime ISO complet pour departure/arrival
-        const today = new Date();
+        const today = searchDate || new Date();
         const [depHour, depMin] = connection.departure_time.split(':').map(Number);
         const [arrHour, arrMin] = connection.arrival_time.split(':').map(Number);
 
