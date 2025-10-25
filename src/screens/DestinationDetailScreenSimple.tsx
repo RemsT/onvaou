@@ -173,7 +173,9 @@ export default function DestinationDetailScreen() {
       <View style={styles.content}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.stationName}>{destination.to_station.name}</Text>
+          <Text style={styles.stationName}>
+            {destination.to_station.real_name || destination.to_station.name}
+          </Text>
         </View>
 
         {/* Infos principales - Sur une seule ligne */}
@@ -296,7 +298,7 @@ export default function DestinationDetailScreen() {
                     })}
                   </Text>
                   <Text style={styles.timelineStationBold}>
-                    {destination.to_station.name}
+                    {destination.to_station.real_name || destination.to_station.name}
                   </Text>
                 </View>
                 <Text style={styles.timelineLabel}>
@@ -371,7 +373,7 @@ export default function DestinationDetailScreen() {
                       latitude: destination.to_station.lat,
                       longitude: destination.to_station.lon,
                     }}
-                    title={destination.to_station.name}
+                    title={destination.to_station.real_name || destination.to_station.name}
                     anchor={{ x: 0.5, y: 0.5 }}
                   >
                     <View style={styles.redMarker} />

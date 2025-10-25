@@ -34,12 +34,13 @@ export const CITY_LABELS: Record<CityLabel, { name: string; icon: string; color:
 };
 
 export interface Station {
-  id: number;
+  id: number | string;
   name: string;
   sncf_id: string;
   lat: number;
   lon: number;
   labels?: CityLabel[];
+  real_name?: string; // Nom de la vraie gare pour les destinations groupées "Toutes les gares"
 }
 
 export interface SearchParams {

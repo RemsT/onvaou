@@ -682,6 +682,55 @@ export class LocalSearchService {
         };
       });
 
+      // Grouper par ville et créer des destinations "Toutes les gares"
+      const cityGroups = new Map<string, SearchResult[]>();
+
+      results.forEach(result => {
+        // Extraire le nom de la ville (avant le tiret ou premier mot)
+        const stationName = result.to_station.name;
+        let cityName = stationName.split(/[-\s]/)[0].trim();
+
+        // Gérer les cas spéciaux
+        if (cityName.toLowerCase() === 'saint' || cityName.toLowerCase() === 'sainte') {
+          const parts = stationName.split(/[-\s]/);
+          if (parts.length > 1) {
+            cityName = `${parts[0]} ${parts[1]}`.trim();
+          }
+        }
+
+        if (!cityGroups.has(cityName)) {
+          cityGroups.set(cityName, []);
+        }
+        cityGroups.get(cityName)!.push(result);
+      });
+
+      // Ajouter des destinations "Toutes les gares" pour les villes avec plusieurs gares
+      cityGroups.forEach((stations, cityName) => {
+        if (stations.length > 1) {
+          // Trouver la meilleure connexion (durée la plus courte)
+          const bestConnection = stations.reduce((best, current) =>
+            current.duration < best.duration ? current : best
+          );
+
+          // Créer une destination groupée
+          // Le nom affiché sera "{Ville} - Toutes les gares" dans la liste
+          // Mais on garde la référence à la vraie gare pour la page de détail
+          const groupedDestination: SearchResult = {
+            ...bestConnection,
+            id: `${cityName}-all-stations`,
+            to_station: {
+              ...bestConnection.to_station,
+              // On garde le nom de la vraie gare dans un champ personnalisé
+              real_name: bestConnection.to_station.name,
+              name: `${cityName} - Toutes les gares`,
+            },
+            to_station_id: `${cityName}-all-stations`,
+          };
+
+          results.push(groupedDestination);
+        }
+      });
+
       // Filtrer par labels si nécessaire
       if (selectedLabels && selectedLabels.length > 0) {
         const filteredIds = filterStationsByLabels(

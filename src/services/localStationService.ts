@@ -54,7 +54,62 @@ export class LocalStationService {
       .slice(0, 10) // Limiter à 10 résultats
       .map(result => result.station);
 
-    return results;
+    // Grouper par ville et ajouter "Toutes les gares" pour les villes avec plusieurs gares
+    const cityGroups = new Map<string, Station[]>();
+
+    results.forEach(station => {
+      // Extraire le nom de la ville
+      let cityName = station.name.split(/[-\s]/)[0].trim();
+
+      // Gérer les cas spéciaux
+      if (cityName.toLowerCase() === 'saint' || cityName.toLowerCase() === 'sainte') {
+        const parts = station.name.split(/[-\s]/);
+        if (parts.length > 1) {
+          cityName = `${parts[0]} ${parts[1]}`.trim();
+        }
+      }
+
+      if (!cityGroups.has(cityName)) {
+        cityGroups.set(cityName, []);
+      }
+      cityGroups.get(cityName)!.push(station);
+    });
+
+    // Construire la liste finale avec les options "Toutes les gares"
+    const finalResults: Station[] = [];
+    const processedCities = new Set<string>();
+
+    results.forEach(station => {
+      let cityName = station.name.split(/[-\s]/)[0].trim();
+
+      if (cityName.toLowerCase() === 'saint' || cityName.toLowerCase() === 'sainte') {
+        const parts = station.name.split(/[-\s]/);
+        if (parts.length > 1) {
+          cityName = `${parts[0]} ${parts[1]}`.trim();
+        }
+      }
+
+      const cityStations = cityGroups.get(cityName) || [];
+
+      // Si c'est la première gare de cette ville et qu'il y a plusieurs gares
+      if (!processedCities.has(cityName) && cityStations.length > 1) {
+        // Ajouter l'option "Toutes les gares" en premier
+        const allStationsOption: Station = {
+          id: `${cityName}-all-stations`,
+          name: `${cityName} - Toutes les gares`,
+          sncf_id: cityStations[0].sncf_id, // Utiliser le SNCF ID de la première gare
+          lat: cityStations[0].lat,
+          lon: cityStations[0].lon,
+          real_name: cityStations[0].name, // Garder la référence à la vraie gare
+        };
+        finalResults.push(allStationsOption);
+        processedCities.add(cityName);
+      }
+
+      finalResults.push(station);
+    });
+
+    return finalResults;
   }
 
   /**

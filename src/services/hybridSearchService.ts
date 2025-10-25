@@ -58,6 +58,70 @@ export class HybridSearchService {
   ): Promise<SearchResult[]> {
     // Utilisation des données locales uniquement (APIs désactivées temporairement)
     console.log('Utilisation des données locales avec estimation des prix');
+
+    // Vérifier si c'est une gare "Toutes les gares"
+    if (typeof fromStation.id === 'string' && fromStation.id.includes('-all-stations')) {
+      // Extraire le nom de la ville
+      const cityName = fromStation.id.replace('-all-stations', '');
+
+      // Trouver toutes les gares de cette ville
+      const cityStations = frenchStations.filter(station => {
+        let stationCityName = station.name.split(/[-\s]/)[0].trim();
+
+        // Gérer les cas spéciaux
+        if (stationCityName.toLowerCase() === 'saint' || stationCityName.toLowerCase() === 'sainte') {
+          const parts = station.name.split(/[-\s]/);
+          if (parts.length > 1) {
+            stationCityName = `${parts[0]} ${parts[1]}`.trim();
+          }
+        }
+
+        return stationCityName === cityName;
+      });
+
+      console.log(`🚀 Recherche optimisée depuis ${cityStations.length} gares de ${cityName}`);
+
+      // OPTIMISATION: Lancer toutes les recherches en parallèle
+      const searchPromises = cityStations.map(station =>
+        LocalSearchService.searchDestinations(
+          station,
+          mode,
+          maxTime,
+          maxBudget,
+          selectedLabels,
+          timeRangeStart,
+          timeRangeEnd,
+          datetime
+        )
+      );
+
+      // Attendre que toutes les recherches soient terminées
+      const allResultsArrays = await Promise.all(searchPromises);
+
+      // Fusionner et dédupliquer les résultats
+      const destinationMap = new Map<string, SearchResult>();
+
+      allResultsArrays.forEach(results => {
+        results.forEach(result => {
+          const destKey = result.to_station_id;
+          const existing = destinationMap.get(destKey);
+
+          // Garder le meilleur résultat (durée la plus courte)
+          if (!existing || result.duration < existing.duration) {
+            destinationMap.set(destKey, result);
+          }
+        });
+      });
+
+      // Convertir en tableau et trier par durée
+      const finalResults = Array.from(destinationMap.values());
+      finalResults.sort((a, b) => a.duration - b.duration);
+
+      console.log(`✅ ${finalResults.length} destinations trouvées après déduplication`);
+
+      return finalResults;
+    }
+
     return LocalSearchService.searchDestinations(fromStation, mode, maxTime, maxBudget, selectedLabels, timeRangeStart, timeRangeEnd, datetime);
   }
 }

@@ -393,7 +393,6 @@ export default function HomeScreen() {
               styles.filterRow,
               enableBudgetFilter && styles.filterRowActive,
               loading && styles.filterRowDisabled,
-              { marginBottom: 0 }
             ]}
           >
             <TouchableOpacity
@@ -431,7 +430,6 @@ export default function HomeScreen() {
             style={[
               styles.filterRow,
               loading && styles.filterRowDisabled,
-              { marginTop: 0 }
             ]}
           >
             <TouchableOpacity
