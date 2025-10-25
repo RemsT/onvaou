@@ -31,9 +31,9 @@ export default function DestinationDetailScreen() {
   const [mapReady, setMapReady] = useState(false);
 
   /**
-   * Construit l'URL de réservation avec les paramètres pré-remplis
+   * Construit l'URL SNCF Connect avec les paramètres pré-remplis
    */
-  const buildBookingURL = (platform: 'sncf' | 'trainline'): string => {
+  const buildSNCFURL = (): string => {
     const departureTime = new Date(destination.departure_time);
     const fromStation = destination.from_station;
     const toStation = destination.to_station;
@@ -48,94 +48,63 @@ export default function DestinationDetailScreen() {
       hour12: false,
     });
 
-    if (platform === 'sncf') {
-      // URL SNCF Connect avec paramètres
-      // Format: https://www.sncf-connect.com/app/home/search?origin={from}&destination={to}&date={date}&time={time}
-      const baseUrl = 'https://www.sncf-connect.com/app/home/search';
+    const baseUrl = 'https://www.sncf-connect.com/app/home/search';
+    const fromName = fromStation ? encodeURIComponent(fromStation.name) : '';
+    const toName = encodeURIComponent(toStation.name);
 
-      // Utiliser le nom de la gare pour la recherche
-      const fromName = fromStation ? encodeURIComponent(fromStation.name) : '';
-      const toName = encodeURIComponent(toStation.name);
-
-      if (fromName) {
-        return `${baseUrl}?origin=${fromName}&destination=${toName}&outwardDate=${dateStr}&outwardTime=${encodeURIComponent(timeStr)}`;
-      } else {
-        // Si pas de gare de départ, juste la destination
-        return `${baseUrl}?destination=${toName}`;
-      }
+    if (fromName) {
+      return `${baseUrl}?origin=${fromName}&destination=${toName}&outwardDate=${dateStr}&outwardTime=${encodeURIComponent(timeStr)}`;
     } else {
-      // URL Trainline avec paramètres
-      // Format: https://www.thetrainline.com/book/results?origin={from}&destination={to}&outwardDate={date}&outwardTime={time}
-      const baseUrl = 'https://www.thetrainline.com/book/results';
-
-      const fromName = fromStation ? encodeURIComponent(fromStation.name) : '';
-      const toName = encodeURIComponent(toStation.name);
-
-      if (fromName) {
-        return `${baseUrl}?origin=${fromName}&destination=${toName}&outwardDate=${dateStr}&outwardHour=${timeStr.split(':')[0]}&outwardMin=${timeStr.split(':')[1]}`;
-      } else {
-        return `${baseUrl}?destination=${toName}`;
-      }
+      return `${baseUrl}?destination=${toName}`;
     }
   };
 
-  const handleBooking = async (platform: 'sncf' | 'trainline') => {
-    // Si c'est SNCF Connect, copier d'abord dans le presse-papier
-    if (platform === 'sncf') {
-      const fromStation = destination.from_station;
-      const toStation = destination.to_station;
+  const handleBooking = async () => {
+    const fromStation = destination.from_station;
+    const toStation = destination.to_station;
 
-      // Utiliser la date et l'heure du train
-      const trainDepartureTime = new Date(destination.departure_time);
+    // Utiliser la date et l'heure du train
+    const trainDepartureTime = new Date(destination.departure_time);
 
-      // Arrondir à l'heure inférieure
-      const roundedHour = trainDepartureTime.getHours();
-      const timeStr = `${roundedHour.toString().padStart(2, '0')}:00`;
+    // Arrondir à l'heure inférieure
+    const roundedHour = trainDepartureTime.getHours();
+    const timeStr = `${roundedHour.toString().padStart(2, '0')}:00`;
 
-      // Format de date: JJ/MM/AAAA
-      const day = trainDepartureTime.getDate().toString().padStart(2, '0');
-      const month = (trainDepartureTime.getMonth() + 1).toString().padStart(2, '0');
-      const year = trainDepartureTime.getFullYear();
-      const dateStr = `${day}/${month}/${year}`;
+    // Format de date: JJ/MM/AAAA
+    const day = trainDepartureTime.getDate().toString().padStart(2, '0');
+    const month = (trainDepartureTime.getMonth() + 1).toString().padStart(2, '0');
+    const year = trainDepartureTime.getFullYear();
+    const dateStr = `${day}/${month}/${year}`;
 
-      const fromName = fromStation ? fromStation.name : '';
-      const toName = toStation.name;
+    const fromName = fromStation ? fromStation.name : '';
+    const toName = toStation.name;
 
-      // Construire le texte à copier: depart de {gare depart}, arrivee a {gare d'arrivee} le {date} a partir de {heure}
-      const textToCopy = `depart de ${fromName}, arrivee a ${toName} le ${dateStr} a partir de ${timeStr}`;
+    // Construire le texte à copier: depart de {gare depart}, arrivee a {gare d'arrivee} le {date} a partir de {heure}
+    const textToCopy = `depart de ${fromName}, arrivee a ${toName} le ${dateStr} a partir de ${timeStr}`;
 
-      try {
-        await Clipboard.setStringAsync(textToCopy);
+    try {
+      await Clipboard.setStringAsync(textToCopy);
 
-        // Afficher la confirmation et ouvrir SNCF Connect
-        Alert.alert(
-          'Copié !',
-          'SNCF Connect va s\'ouvrir! Collez les informations dans la barre de recherche.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                const url = buildBookingURL(platform);
-                Linking.openURL(url).catch((error) => {
-                  console.error('Error opening URL:', error);
-                  Alert.alert('Erreur', "Impossible d'ouvrir le lien");
-                });
-              }
+      // Afficher la confirmation et ouvrir SNCF Connect
+      Alert.alert(
+        'Copié !',
+        'SNCF Connect va s\'ouvrir.\nCollez les informations dans la barre de recherche.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              const url = buildSNCFURL();
+              Linking.openURL(url).catch((error) => {
+                console.error('Error opening URL:', error);
+                Alert.alert('Erreur', "Impossible d'ouvrir le lien");
+              });
             }
-          ]
-        );
-      } catch (error) {
-        console.error('Error copying to clipboard:', error);
-        Alert.alert('Erreur', 'Impossible de copier dans le presse-papier');
-      }
-    } else {
-      // Pour Trainline, comportement normal
-      const url = buildBookingURL(platform);
-      console.log(`Opening ${platform} with URL:`, url);
-      Linking.openURL(url).catch((error) => {
-        console.error('Error opening URL:', error);
-        Alert.alert('Erreur', "Impossible d'ouvrir le lien");
-      });
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error copying to clipboard:', error);
+      Alert.alert('Erreur', 'Impossible de copier dans le presse-papier');
     }
   };
 
@@ -344,23 +313,10 @@ export default function DestinationDetailScreen() {
 
           <TouchableOpacity
             style={styles.bookingButton}
-            onPress={() => handleBooking('sncf')}
+            onPress={handleBooking}
           >
             <Text style={styles.bookingButtonText}>
               Réserver sur SNCF Connect
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.bookingButton, styles.bookingButtonSecondary]}
-            onPress={() => handleBooking('trainline')}
-          >
-            <Text
-              style={[
-                styles.bookingButtonText,
-                styles.bookingButtonTextSecondary,
-              ]}
-            >
-              Voir sur Trainline
             </Text>
           </TouchableOpacity>
         </View>
@@ -597,19 +553,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  bookingButtonSecondary: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#4CAF50',
-    shadowOpacity: 0,
-  },
   bookingButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-  },
-  bookingButtonTextSecondary: {
-    color: '#4CAF50',
   },
   infoBox: {
     backgroundColor: '#E3F2FD',

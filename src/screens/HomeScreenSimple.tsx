@@ -10,6 +10,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from 'react-native';
 import CustomDateTimePicker from '../components/DateTimePicker';
 import LabelSelectionField from '../components/LabelSelectionField';
@@ -66,6 +67,7 @@ export default function HomeScreen() {
   };
 
   const handleSelectStation = (station: Station) => {
+    Keyboard.dismiss(); // Fermer le clavier immédiatement
     setFromStation(station);
     setStationSearch('');
     setStationSuggestions([]);
@@ -259,7 +261,11 @@ export default function HomeScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.container}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Hero Section */}
         <View style={styles.heroSection}>
         <Text style={styles.logo}>ONvaOU</Text>
@@ -311,6 +317,7 @@ export default function HomeScreen() {
                       ]}
                       onPress={() => handleSelectStation(station)}
                       disabled={loading}
+                      activeOpacity={0.7}
                     >
                       <Text style={styles.suggestionText}>{station.name}</Text>
                     </TouchableOpacity>
