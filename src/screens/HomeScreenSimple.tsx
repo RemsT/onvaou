@@ -329,7 +329,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Date & Time Range Card */}
-        <View style={[styles.card, loading && styles.filterRowDisabled]}>
+        <View style={styles.card}>
           <Text style={styles.cardTitle}>Date et heure de départ</Text>
           <CustomDateTimePicker
             value={selectedDate}

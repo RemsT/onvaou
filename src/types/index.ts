@@ -52,10 +52,10 @@ export interface SearchParams {
 }
 
 export interface SearchResult {
-  id: number;
+  id: number | string;
   search_id: number;
   from_station?: Station; // Gare de départ (optionnel pour compatibilité)
-  to_station_id: number;
+  to_station_id: number | string;
   to_station: Station;
   duration: number; // en minutes
   price: number; // en euros (prix moyen)

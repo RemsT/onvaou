@@ -84,7 +84,6 @@ class GTFSInitializationService {
       // Créer la base de données avec options explicites
       console.log(`🔓 Ouverture de la base de données en mode lecture/écriture...`);
       const db = await SQLite.openDatabaseAsync(this.dbName, {
-        enableCRSQLite: false,
         useNewConnection: true,
       });
 
@@ -109,7 +108,23 @@ class GTFSInitializationService {
       // ANALYZE uniquement pour optimiser les requêtes
       await db.execAsync('ANALYZE;');
 
+      // Activer le mode WAL pour permettre les lectures concurrentes
+      await db.execAsync('PRAGMA journal_mode = WAL;');
+      await db.execAsync('PRAGMA locking_mode = NORMAL;');
+      await db.execAsync('PRAGMA synchronous = NORMAL;');
+      console.log('✅ Mode WAL activé pour lectures concurrentes');
+
+      // NE PAS fermer la connexion immédiatement
+      // Laisser gtfsDatabaseServiceEnhanced réutiliser cette connexion
+      console.log('✅ Base de données prête, fermeture de la connexion...');
+
       await db.closeAsync();
+      console.log('✅ Connexion d\'initialisation fermée');
+
+      // Attendre 2 secondes pour s'assurer que la connexion est libérée
+      // Android peut prendre plus de temps que iOS pour libérer les verrous SQLite
+      console.log('⏳ Attente de la libération du verrou SQLite...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       onProgress?.({
         step: 'complete',
@@ -238,7 +253,7 @@ class GTFSInitializationService {
     onProgress?.({
       step: 'import_stop_times',
       progress: 40,
-      message: 'Import des horaires (peut prendre 2-3 minutes)...'
+      message: 'Import des horaires (peut prendre 4-5 minutes)...'
     });
     await this.importStopTimes(db);
 
@@ -476,6 +491,7 @@ class GTFSInitializationService {
     await db.execAsync('PRAGMA foreign_keys = OFF;');
     await db.execAsync('PRAGMA synchronous = OFF;');
     await db.execAsync('PRAGMA journal_mode = MEMORY;');
+    await db.execAsync('PRAGMA locking_mode = EXCLUSIVE;'); // Lock exclusif pendant l'import
 
     const BATCH_SIZE = 500;
     let processedRows = 0;
@@ -513,10 +529,11 @@ class GTFSInitializationService {
       }
     });
 
-    // Réactiver les contraintes
+    // Réactiver les contraintes et configurer pour les lectures concurrentes
     await db.execAsync('PRAGMA foreign_keys = ON;');
     await db.execAsync('PRAGMA synchronous = NORMAL;');
-    await db.execAsync('PRAGMA journal_mode = DELETE;');
+    await db.execAsync('PRAGMA journal_mode = WAL;'); // Mode WAL pour lectures concurrentes
+    await db.execAsync('PRAGMA locking_mode = NORMAL;'); // Retour au mode normal
 
     console.log('✓ Horaires importés');
   }

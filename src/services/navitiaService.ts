@@ -135,8 +135,8 @@ export class NavitiaService {
     from: Station,
     destinations: Station[],
     datetime?: Date
-  ): Promise<Map<number, NavitiaJourney[]>> {
-    const results = new Map<number, NavitiaJourney[]>();
+  ): Promise<Map<number | string, NavitiaJourney[]>> {
+    const results = new Map<number | string, NavitiaJourney[]>();
 
     // Recherche en parallèle pour toutes les destinations
     const promises = destinations.map(async (destination) => {

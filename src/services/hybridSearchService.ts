@@ -103,7 +103,7 @@ export class HybridSearchService {
 
       allResultsArrays.forEach(results => {
         results.forEach(result => {
-          const destKey = result.to_station_id;
+          const destKey = String(result.to_station_id);
           const existing = destinationMap.get(destKey);
 
           // Garder le meilleur résultat (durée la plus courte)

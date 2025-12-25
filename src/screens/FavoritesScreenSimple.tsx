@@ -30,7 +30,7 @@ export default function FavoritesScreen() {
     setLoading(false);
   };
 
-  const handleRemoveFavorite = async (stationId: number) => {
+  const handleRemoveFavorite = async (stationId: number | string) => {
     Alert.alert(
       'Supprimer',
       'Voulez-vous retirer cette destination de vos favoris ?',
@@ -40,7 +40,7 @@ export default function FavoritesScreen() {
           text: 'Supprimer',
           style: 'destructive',
           onPress: async () => {
-            const success = await LocalFavoriteService.removeFavorite(stationId);
+            const success = await LocalFavoriteService.removeFavorite(typeof stationId === 'number' ? stationId : parseInt(stationId));
             if (success) {
               setFavorites((prev) =>
                 prev.filter((fav) => fav.id !== stationId)

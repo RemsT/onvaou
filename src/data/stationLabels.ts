@@ -3735,13 +3735,14 @@ export function getStationLabels(stationId: number): CityLabel[] {
 /**
  * Filtre les stations par labels sélectionnés
  */
-export function filterStationsByLabels(stationIds: number[], selectedLabels: CityLabel[]): number[] {
+export function filterStationsByLabels(stationIds: (number | string)[], selectedLabels: CityLabel[]): (number | string)[] {
   if (selectedLabels.length === 0) {
     return stationIds;
   }
 
   return stationIds.filter(stationId => {
-    const labels = getStationLabels(stationId);
+    const numericId = typeof stationId === 'number' ? stationId : parseInt(stationId);
+    const labels = getStationLabels(numericId);
     return selectedLabels.some(selectedLabel => labels.includes(selectedLabel));
   });
 }
@@ -3749,10 +3750,11 @@ export function filterStationsByLabels(stationIds: number[], selectedLabels: Cit
 /**
  * Compte le nombre de correspondances de labels pour une station
  */
-export function countLabelMatches(stationId: number, selectedLabels: CityLabel[]): number {
+export function countLabelMatches(stationId: number | string, selectedLabels: CityLabel[]): number {
   if (selectedLabels.length === 0) return 0;
 
-  const labels = getStationLabels(stationId);
+  const numericId = typeof stationId === 'number' ? stationId : parseInt(stationId);
+  const labels = getStationLabels(numericId);
   return selectedLabels.filter(selectedLabel => labels.includes(selectedLabel)).length;
 }
 
