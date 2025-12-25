@@ -4,7 +4,7 @@ import { CITY_LABELS, CityLabel } from '../types';
 import { getStationLabels } from '../data/stationLabels';
 
 interface StationLabelsProps {
-  stationId: number;
+  stationId: number | string;
   maxDisplay?: number;
   compact?: boolean;
 }
@@ -14,7 +14,8 @@ export default function StationLabels({
   maxDisplay = 3,
   compact = false
 }: StationLabelsProps) {
-  const labels = getStationLabels(stationId);
+  const numericId = typeof stationId === 'number' ? stationId : parseInt(stationId);
+  const labels = getStationLabels(numericId);
 
   if (labels.length === 0) {
     return null;

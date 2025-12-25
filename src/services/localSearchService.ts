@@ -23,6 +23,10 @@ interface TrainConnection {
   route_type: 'TGV' | 'INTERCITES' | 'TER' | 'RER' | 'AUTRE';
   transfers?: number; // Nombre de correspondances (0 = direct, 1 = 1 changement, etc.)
   transferStation?: string; // Nom de la gare de correspondance
+  transferLat?: number; // Coordonnées de la gare de correspondance
+  transferLon?: number; // Coordonnées de la gare de correspondance
+  transferArrival?: string; // Heure d'arrivée à la gare de correspondance
+  transferDeparture?: string; // Heure de départ de la gare de correspondance
 }
 
 export class LocalSearchService {

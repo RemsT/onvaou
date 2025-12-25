@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Linking,
   Alert,
-  Dimensions,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
@@ -21,8 +20,6 @@ type DestinationDetailRouteProp = RouteProp<
   'DestinationDetail'
 >;
 type DestinationDetailNavigationProp = StackNavigationProp<RootStackParamList>;
-
-const { width } = Dimensions.get('window');
 
 export default function DestinationDetailScreen() {
   const route = useRoute<DestinationDetailRouteProp>();

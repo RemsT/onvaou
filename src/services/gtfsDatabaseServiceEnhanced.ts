@@ -48,6 +48,12 @@ export interface JourneyWithTransfer {
   totalDuration: number;
   transferTime?: number;
   transferStation?: string;
+  transferLat?: number;
+  transferLon?: number;
+  departureTime?: string;
+  transferArrival?: string;
+  transferDeparture?: string;
+  arrivalTime?: string;
 }
 
 export interface CalendarService {
@@ -66,6 +72,7 @@ export interface CalendarService {
 class GTFSDatabaseServiceEnhanced {
   private db: SQLite.SQLiteDatabase | null = null;
   private initialized = false;
+  private initializationPromise: Promise<void> | null = null;
 
   /**
    * Ferme la connexion à la base de données
@@ -80,6 +87,7 @@ class GTFSDatabaseServiceEnhanced {
       }
       this.db = null;
       this.initialized = false;
+      this.initializationPromise = null;
     }
   }
 
@@ -89,25 +97,49 @@ class GTFSDatabaseServiceEnhanced {
    * au premier lancement de l'application
    */
   async initialize(): Promise<void> {
-    if (this.initialized) {
+    // Si déjà initialisé, retourner immédiatement
+    if (this.initialized && this.db) {
       return;
     }
 
-    try {
-      const dbPath = `${FileSystem.documentDirectory}SQLite/gtfs.db`;
+    // Si une initialisation est en cours, attendre qu'elle se termine
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
 
-      // Vérifier que la base de données existe
-      const dbInfo = await FileSystem.getInfoAsync(dbPath);
-      if (!dbInfo.exists) {
-        throw new Error(
-          'Base de données GTFS non trouvée. Elle sera créée automatiquement au prochain lancement de l\'application.'
-        );
-      }
+    // Créer une nouvelle promesse d'initialisation
+    this.initializationPromise = this._performInitialization();
+    return this.initializationPromise;
+  }
 
-      // Ouvrir la base de données existante
-      this.db = await SQLite.openDatabaseAsync('gtfs.db');
-      this.initialized = true;
-      debugLog('✅ Base de données GTFS initialisée');
+  /**
+   * Effectue l'initialisation réelle avec retry logic (méthode privée)
+   */
+  private async _performInitialization(): Promise<void> {
+    const MAX_RETRIES = 5;
+    const BASE_DELAY_MS = 500; // Délai de base de 500ms
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        debugLog(`[GTFSDatabaseServiceEnhanced] Tentative d'ouverture ${attempt}/${MAX_RETRIES}...`);
+
+        const dbPath = `${FileSystem.documentDirectory}SQLite/gtfs.db`;
+
+        // Vérifier que la base de données existe
+        const dbInfo = await FileSystem.getInfoAsync(dbPath);
+        if (!dbInfo.exists) {
+          throw new Error(
+            'Base de données GTFS non trouvée. Elle sera créée automatiquement au prochain lancement de l\'application.'
+          );
+        }
+
+        // Ouvrir la base de données existante avec connexion partagée
+        // useNewConnection: false permet de réutiliser la connexion existante si disponible
+        this.db = await SQLite.openDatabaseAsync('gtfs.db', {
+          useNewConnection: false,
+        });
+        this.initialized = true;
+        debugLog('✅ Base de données GTFS initialisée (connexion partagée)');
 
       // Vérifier que la vue direct_connections existe et contient des données
       const viewExists = await this.db.getAllAsync<any>(
@@ -155,11 +187,50 @@ class GTFSDatabaseServiceEnhanced {
         errorLog('💡 Les tables sous-jacentes (stop_times, trips, routes, stops) sont probablement vides');
         errorLog('💡 Solution: Réinitialiser la base de données GTFS complètement');
       }
-    } catch (error) {
+
+      // Initialisation réussie, sortir de la boucle de retry
+      debugLog(`✅ Initialisation réussie à la tentative ${attempt}`);
+      return;
+
+    } catch (error: any) {
+      // Si c'est une erreur de database locked et qu'il reste des tentatives
+      const isDatabaseLockedError = error?.message?.includes('database is locked') ||
+                                     error?.message?.includes('database locked');
+
+      if (isDatabaseLockedError && attempt < MAX_RETRIES) {
+        // Calculer le délai avec backoff exponentiel (500ms, 1000ms, 2000ms, 4000ms, 8000ms)
+        const delayMs = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        errorLog(`⚠️ Base de données verrouillée (tentative ${attempt}/${MAX_RETRIES}), nouvelle tentative dans ${delayMs}ms...`);
+
+        // Fermer la connexion potentiellement bloquée
+        if (this.db) {
+          try {
+            await this.db.closeAsync();
+          } catch (closeError) {
+            // Ignorer les erreurs de fermeture
+          }
+          this.db = null;
+          this.initialized = false;
+        }
+
+        // Attendre avant de réessayer
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+
+        // Continue la boucle pour réessayer
+        continue;
+      }
+
+      // Si c'est la dernière tentative ou une autre erreur, propager l'erreur
       errorLog('❌ Erreur lors de l\'initialisation de la DB GTFS:', error);
+      this.initialized = false;
+      this.db = null;
       throw error;
     }
   }
+
+  // Si on arrive ici, toutes les tentatives ont échoué
+  throw new Error('Impossible d\'ouvrir la base de données après plusieurs tentatives');
+}
 
   /**
    * Crée la vue direct_connections si elle n'existe pas
@@ -919,17 +990,6 @@ class GTFSDatabaseServiceEnhanced {
     }
 
     return filtered;
-  }
-
-  /**
-   * Ferme la connexion à la base de données
-   */
-  async close(): Promise<void> {
-    if (this.db) {
-      await this.db.closeAsync();
-      this.db = null;
-      this.initialized = false;
-    }
   }
 }
 

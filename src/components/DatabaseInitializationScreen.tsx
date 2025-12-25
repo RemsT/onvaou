@@ -84,7 +84,7 @@ export const DatabaseInitializationScreen: React.FC<DatabaseInitializationScreen
             {/* Note pour les horaires */}
             {progress.step === 'import_stop_times' && (
               <Text style={styles.note}>
-                Cette étape peut prendre 2-3 minutes...
+                Cette étape peut prendre 5-10 minutes...
               </Text>
             )}
           </>

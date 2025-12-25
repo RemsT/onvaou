@@ -473,7 +473,7 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
               <TouchableOpacity onPress={cancelSelection} style={styles.headerButton}>
                 <Text style={styles.cancelButton}>Annuler</Text>
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>Date et heure de départ</Text>
+              <Text style={styles.modalTitle} numberOfLines={1} ellipsizeMode="tail">Date et horaires</Text>
               <TouchableOpacity
                 onPress={confirmDateTime}
                 style={styles.headerButton}
@@ -634,9 +634,12 @@ const styles = StyleSheet.create({
     minWidth: 70,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '700',
     color: '#0C3823',
+    flex: 1,
+    textAlign: 'center',
+    paddingHorizontal: 8,
   },
   cancelButton: {
     fontSize: 16,
