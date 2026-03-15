@@ -420,7 +420,7 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, disabled && { opacity: 0.5 }]}>
       {label && <Text style={styles.label}>{label}</Text>}
 
       {/* Bouton principal */}
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     color: '#5F6368',
     fontWeight: '600',
     marginRight: 6,
-    width: 60,
+    width: 78,
   },
   dateTimeValue: {
     fontSize: 16,

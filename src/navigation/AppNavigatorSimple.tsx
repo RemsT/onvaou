@@ -20,6 +20,7 @@ export type RootStackParamList = {
     mode: 'time' | 'budget' | 'both';
     maxValue?: number;
     searchDate?: number; // timestamp
+    maxTransfers?: number; // 0 = direct, 1 = 1 correspondance, 2 = 2 correspondances
   };
   MapView: {
     fromStation: Station;
@@ -27,10 +28,18 @@ export type RootStackParamList = {
     mode: 'time' | 'budget' | 'both';
     maxValue?: number;
     searchDate?: number; // timestamp
+    maxTransfers?: number;
   };
   DestinationDetail: {
     destination: SearchResult;
     searchDate?: number; // timestamp
+    mapParams?: {
+      fromStation: Station;
+      results: SearchResult[];
+      mode: 'time' | 'budget' | 'both';
+      maxValue?: number;
+      maxTransfers?: number;
+    };
   };
 };
 
@@ -89,7 +98,7 @@ export default function AppNavigator() {
           name="MapView"
           component={MapScreen}
           options={{
-            title: 'Carte',
+            title: 'Destinations',
             headerStyle: {
               backgroundColor: '#4CAF50',
             },

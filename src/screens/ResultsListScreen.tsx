@@ -16,14 +16,14 @@ import { PriceEstimationService } from '../services/priceEstimationService';
 
 type ResultsListRouteProp = RouteProp<RootStackParamList, 'ResultsList'>;
 type ResultsListNavigationProp = StackNavigationProp<RootStackParamList>;
-type SortType = 'duration' | 'departure';
+type SortType = 'duration' | 'departure' | 'price';
 type SortOrder = 'asc' | 'desc';
 
 export default function ResultsListScreen() {
   const route = useRoute<ResultsListRouteProp>();
   const navigation = useNavigation<ResultsListNavigationProp>();
 
-  const { fromStation, results, mode, maxValue, searchDate } = route.params;
+  const { fromStation, results, mode, maxValue, searchDate, maxTransfers } = route.params;
   const [sortType, setSortType] = useState<SortType>('duration');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
@@ -45,8 +45,11 @@ export default function ResultsListScreen() {
 
     if (sortType === 'duration') {
       comparison = a.duration - b.duration;
+    } else if (sortType === 'price') {
+      const aMax = a.priceRange?.max ?? a.price ?? 0;
+      const bMax = b.priceRange?.max ?? b.price ?? 0;
+      comparison = aMax - bMax;
     } else {
-      // Tri par heure de départ
       comparison = new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime();
     }
 
@@ -57,18 +60,8 @@ export default function ResultsListScreen() {
   const handleDestinationPress = (destination: SearchResult) => {
     navigation.navigate('DestinationDetail', {
       destination,
-      searchDate
-    });
-  };
-
-  const handleViewMap = () => {
-    // Afficher tous les résultats sur la carte (pas de limite)
-    navigation.navigate('MapView', {
-      fromStation,
-      results: sortedResults,
-      mode,
-      maxValue,
       searchDate,
+      mapParams: { fromStation, results: sortedResults, mode, maxValue, maxTransfers },
     });
   };
 
@@ -89,6 +82,15 @@ export default function ResultsListScreen() {
             {item.duration % 60 > 0 ? ` ${item.duration % 60}min` : ''}
           </Text>
         </View>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabelSmall}>Départ:</Text>
+          <Text style={styles.detailTextSmall}>
+            {new Date(item.departure_time).toLocaleTimeString('fr-FR', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </Text>
+        </View>
         {item.priceRange && (
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>Prix:</Text>
@@ -97,15 +99,6 @@ export default function ResultsListScreen() {
             </Text>
           </View>
         )}
-        <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Départ:</Text>
-          <Text style={styles.detailText}>
-            {new Date(item.departure_time).toLocaleTimeString('fr-FR', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </Text>
-        </View>
         {item.transfers !== undefined && item.transfers > 0 && (
           <View style={styles.transferBadge}>
             <Text style={styles.transferBadgeText}>
@@ -120,33 +113,26 @@ export default function ResultsListScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Icône carte en haut à droite */}
-      <TouchableOpacity style={styles.mapIconButton} onPress={handleViewMap}>
-        <Text style={styles.mapIcon}>CARTE</Text>
-      </TouchableOpacity>
-
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Depuis {fromStation.name}</Text>
-          <Text style={styles.headerSubtitle}>
-            {sortedResults.length} destination{sortedResults.length > 1 ? 's' : ''} trouvée
-            {sortedResults.length > 1 ? 's' : ''}
-          </Text>
-          {mode === 'time' && maxValue && (
-            <Text style={styles.headerCriteria}>
-              Temps max: {Math.floor(maxValue / 60)}h
-              {maxValue % 60 > 0 ? ` ${maxValue % 60}min` : ''}
+          <View style={styles.headerRow}>
+            <Text style={styles.headerSubtitle}>
+              {sortedResults.length} destination{sortedResults.length > 1 ? 's' : ''} trouvée{sortedResults.length > 1 ? 's' : ''}
             </Text>
-          )}
-          {mode === 'budget' && maxValue && (
-            <Text style={styles.headerCriteria}>Budget max: {maxValue}€</Text>
-          )}
-          {mode === 'both' && (
-            <Text style={styles.headerCriteria}>
-              Critères combinés (temps et budget)
-            </Text>
-          )}
+            {mode === 'time' && maxValue && (
+              <Text style={styles.headerCriteria}>
+                · {Math.floor(maxValue / 60)}h{maxValue % 60 > 0 ? `${maxValue % 60}min` : ''} max
+              </Text>
+            )}
+            {mode === 'budget' && maxValue && (
+              <Text style={styles.headerCriteria}>· {maxValue}€ max</Text>
+            )}
+            {mode === 'both' && (
+              <Text style={styles.headerCriteria}>· temps & budget</Text>
+            )}
+          </View>
         </View>
       </View>
 
@@ -210,15 +196,35 @@ export default function ResultsListScreen() {
               )}
             </View>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.sortButton,
+              sortType === 'price' && styles.sortButtonActive,
+            ]}
+            onPress={() => handleSortChange('price')}
+          >
+            <View style={styles.sortButtonContent}>
+              <Text
+                style={[
+                  styles.sortButtonText,
+                  sortType === 'price' && styles.sortButtonTextActive,
+                ]}
+              >
+                Prix max
+              </Text>
+              {sortType === 'price' && (
+                <Text
+                  style={[
+                    styles.sortArrow,
+                    sortType === 'price' && styles.sortArrowActive,
+                  ]}
+                >
+                  {sortOrder === 'asc' ? '↑' : '↓'}
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
         </View>
-      </View>
-
-      {/* Price Warning */}
-      <View style={styles.warningBanner}>
-        <Text style={styles.warningIcon}>ℹ️</Text>
-        <Text style={styles.warningText}>
-          {PriceEstimationService.getPriceWarning()}
-        </Text>
       </View>
 
       {/* Liste des résultats */}
@@ -248,54 +254,33 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#4CAF50',
-    padding: 20,
-    paddingTop: 15,
-    paddingBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   headerContent: {
     marginBottom: 0,
-    paddingRight: 80,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexWrap: 'wrap',
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 6,
+    marginBottom: 3,
   },
   headerSubtitle: {
-    fontSize: 15,
+    fontSize: 13,
     color: '#ffffff',
     opacity: 0.95,
-    marginBottom: 4,
   },
   headerCriteria: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#ffffff',
-    opacity: 0.9,
-  },
-  mapIconButton: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
-    zIndex: 10,
-    borderWidth: 2,
-    borderColor: '#E8EAED',
-  },
-  mapIcon: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0C3823',
+    opacity: 0.85,
   },
   listContent: {
     padding: 16,
@@ -349,6 +334,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#0C3823',
   },
+  detailLabelSmall: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#5F6368',
+  },
+  detailTextSmall: {
+    fontSize: 11,
+    color: '#0C3823',
+  },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
@@ -389,6 +383,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     paddingHorizontal: 16,
+    justifyContent: 'center',
     borderRadius: 8,
     backgroundColor: '#F7F9FC',
     borderWidth: 2,
@@ -419,25 +414,6 @@ const styles = StyleSheet.create({
   },
   sortArrowActive: {
     color: '#4CAF50',
-  },
-  warningBanner: {
-    backgroundColor: '#FFF9E6',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#FFE082',
-  },
-  warningIcon: {
-    fontSize: 18,
-    marginRight: 10,
-  },
-  warningText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#F57C00',
-    lineHeight: 16,
   },
   transferBadge: {
     backgroundColor: '#FFF3E0',

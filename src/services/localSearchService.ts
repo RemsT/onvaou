@@ -3,7 +3,7 @@ import { frenchStations } from '../data/frenchStations';
 import { LocationService } from './locationService';
 import { filterStationsByLabels, countLabelMatches } from '../data/stationLabels';
 import { PriceEstimationService } from './priceEstimationService';
-import { gtfsDbEnhanced } from './gtfsDatabaseServiceEnhanced';
+import { gtfsDbEnhanced, JourneyWithTransfer } from './gtfsDatabaseServiceEnhanced';
 
 // Mode debug activé uniquement en développement
 const DEBUG_MODE = __DEV__;
@@ -33,6 +33,22 @@ export class LocalSearchService {
   // Cache pour les stations GTFS (évite les recherches répétées)
   private static stationCache = new Map<string, Station | null>();
 
+  // Cache pour la conversion SNCF ID -> GTFS stop_id (pour éviter les recherches SQL répétées)
+  private static gtfsIdCache = new Map<string, string | null>();
+
+  // Cache des résultats de recherche pour éviter les recalculs lorsque l'utilisateur change légèrement les filtres
+  private static searchCache = new Map<string, SearchResult[]>();
+  private static readonly SEARCH_CACHE_LIMIT = 50;
+
+  /**
+   * Vide les caches internes (appelé lors de la réinitialisation de la base de données)
+   */
+  static clearCache() {
+    this.stationCache.clear();
+    this.gtfsIdCache.clear();
+    this.searchCache.clear();
+  }
+
   /**
    * Convertit un sncf_id (court ou long) en format GTFS long
    * Ex: "87686006" -> "StopArea:OCE87686006"
@@ -43,10 +59,16 @@ export class LocalSearchService {
     try {
       debugLog(`[LocalSearchService] 🔎 Recherche GTFS pour: ${sncfId}`);
 
+      // Vérifier le cache GTFS ID
+      if (this.gtfsIdCache.has(sncfId)) {
+        return this.gtfsIdCache.get(sncfId)!;
+      }
+
       // Extraire le numéro à 8 chiffres du sncf_id
       const match = sncfId.match(/\d{8}/);
       if (!match) {
         errorLog(`[LocalSearchService] ❌ Impossible d'extraire le numéro SNCF de: ${sncfId}`);
+        this.gtfsIdCache.set(sncfId, null);
         return null;
       }
 
@@ -66,6 +88,7 @@ export class LocalSearchService {
 
       if (stopsByName.length > 0) {
         debugLog(`[LocalSearchService] ✅ Stop GTFS trouvé (exact): ${stopsByName[0].stop_id}`);
+        this.gtfsIdCache.set(sncfId, stopsByName[0].stop_id);
         return stopsByName[0].stop_id;
       }
 
@@ -82,15 +105,16 @@ export class LocalSearchService {
         // TOUJOURS prioriser les StopArea (gares principales)
         // Les connexions GTFS sont sur les StopArea, pas les StopPoint
         const stopArea = stopsByNumber.find(s => s.stop_id.startsWith('StopArea:'));
+        const chosenStop = stopArea || stopsByNumber[0];
 
         if (stopArea) {
           debugLog(`[LocalSearchService] ✅ Stop GTFS trouvé (StopArea): ${stopArea.stop_id} (${stopArea.stop_name})`);
-          return stopArea.stop_id;
+        } else {
+          debugLog(`[LocalSearchService] ⚠️ Aucun StopArea trouvé, utilisation de: ${chosenStop.stop_id}`);
         }
 
-        // Si vraiment aucun StopArea, prendre le premier
-        debugLog(`[LocalSearchService] ⚠️ Aucun StopArea trouvé, utilisation de: ${stopsByNumber[0].stop_id}`);
-        return stopsByNumber[0].stop_id;
+        this.gtfsIdCache.set(sncfId, chosenStop.stop_id);
+        return chosenStop.stop_id;
       }
 
       errorLog(`[LocalSearchService] ❌ Aucun stop GTFS trouvé pour le numéro: ${sncfNumber}`);
@@ -106,12 +130,16 @@ export class LocalSearchService {
 
         if (stopsByStationName.length > 0) {
           const stopArea = stopsByStationName.find(s => s.stop_id.startsWith('StopArea:'));
+          const chosenStop = stopArea || stopsByStationName[0];
+
           if (stopArea) {
             debugLog(`[LocalSearchService] ✅ Stop trouvé par nom: ${stopArea.stop_id} (${stopArea.stop_name})`);
-            return stopArea.stop_id;
+          } else {
+            debugLog(`[LocalSearchService] ✅ Stop trouvé par nom: ${chosenStop.stop_id}`);
           }
-          debugLog(`[LocalSearchService] ✅ Stop trouvé par nom: ${stopsByStationName[0].stop_id}`);
-          return stopsByStationName[0].stop_id;
+
+          this.gtfsIdCache.set(sncfId, chosenStop.stop_id);
+          return chosenStop.stop_id;
         }
       }
 
@@ -282,7 +310,8 @@ export class LocalSearchService {
     selectedLabels?: CityLabel[],
     timeRangeStart?: string,
     timeRangeEnd?: string,
-    searchDate?: Date
+    searchDate?: Date,
+    maxTransfers: number = 1 // 0 = direct only, 1 = at most 1 transfer, 2 = allow 2 transfers
   ): Promise<SearchResult[]> {
     debugLog('========================================');
     debugLog('[LocalSearchService] 🔍 RECHERCHE DÉMARRÉE');
@@ -291,6 +320,25 @@ export class LocalSearchService {
     debugLog(`[LocalSearchService] Mode: ${mode}`);
     debugLog(`[LocalSearchService] Max Time: ${maxTime}`);
     debugLog('========================================');
+
+    // Vérifier le cache de recherche pour éviter de recalculer si les filtres sont identiques
+    const cacheKey = JSON.stringify({
+      id: fromStation.id,
+      sncf_id: fromStation.sncf_id,
+      mode,
+      maxTime,
+      maxBudget,
+      timeRangeStart,
+      timeRangeEnd,
+      maxTransfers,
+      selectedLabels: selectedLabels ? selectedLabels.map(l => l.id).sort() : [],
+      searchDate: searchDate ? searchDate.toISOString().slice(0, 10) : undefined,
+    });
+
+    if (this.searchCache.has(cacheKey)) {
+      debugLog('[LocalSearchService] ✅ Résultat de recherche récupéré depuis le cache');
+      return this.searchCache.get(cacheKey)!;
+    }
 
     // UTILISATION EXCLUSIVE DES DONNÉES GTFS
     if (!fromStation.sncf_id) {
@@ -309,8 +357,17 @@ export class LocalSearchService {
         selectedLabels,
         timeRangeStart,
         timeRangeEnd,
-        searchDate
+        searchDate,
+        maxTransfers
       );
+
+      // Mettre en cache les résultats pour les mêmes paramètres
+      this.searchCache.set(cacheKey, gtfsResults);
+      if (this.searchCache.size > this.SEARCH_CACHE_LIMIT) {
+        // Supprimer l'entrée la plus ancienne (première insérée)
+        const firstKey = this.searchCache.keys().next().value;
+        this.searchCache.delete(firstKey);
+      }
 
       debugLog('========================================');
       debugLog(`[LocalSearchService] ✅ RÉSULTAT GTFS : ${gtfsResults.length} destinations`);
@@ -336,7 +393,8 @@ export class LocalSearchService {
     selectedLabels?: CityLabel[],
     timeRangeStart?: string,
     timeRangeEnd?: string,
-    searchDate?: Date
+    searchDate?: Date,
+    maxTransfers: number = 1
   ): Promise<SearchResult[]> {
     debugLog('[LocalSearchService] 🚂 Recherche avec horaires GTFS réels');
     debugLog(`[LocalSearchService] 📅 Filtres: maxTime=${maxTime}min, maxBudget=${maxBudget}€`);
@@ -372,115 +430,154 @@ export class LocalSearchService {
       // Map pour stocker la meilleure connexion par destination
       const bestConnectionByDestination = new Map<string, TrainConnection>();
 
-      // 1️⃣ CONNEXIONS DIRECTES (sans changement)
-      debugLog('[LocalSearchService] 📍 Étape 1/2: Connexions directes...');
-      debugLog(`[LocalSearchService] 🔍 Recherche depuis: ${fromGTFSId}`);
-      debugLog(`[LocalSearchService] 🕐 Plage horaire: ${departureTime} - ${timeRangeEnd}`);
-      const step1Start = Date.now();
-      const directConnections = await gtfsDbEnhanced.findAllDestinationsFrom(
-        fromGTFSId,
-        departureTime,
-        timeRangeEnd,
-        2000
-      );
-      const step1Time = Date.now() - step1Start;
-      debugLog(`[LocalSearchService] ✅ ${directConnections.length} connexions directes (${step1Time}ms)`);
+      // Si l'utilisateur souhaite autoriser 2 correspondances, utiliser une requête SQL dédiée
+      if (maxTransfers >= 2) {
+        debugLog('[LocalSearchService] 🔥 Recherche avec jusqu\'à 2 correspondances (findAllJourneys)...');
 
-      if (directConnections.length === 0) {
-        console.warn('[LocalSearchService] ⚠️ AUCUNE connexion directe trouvée! Vérifiez:');
-        console.warn('  1. La base de données GTFS est-elle initialisée?');
-        console.warn('  2. La vue direct_connections contient-elle des données?');
-        console.warn('  3. Le stop_id de départ est-il correct?');
-      }
+        const journeys = await gtfsDbEnhanced.findAllJourneys(fromGTFSId, departureTime, maxTransfers);
+        debugLog(`[LocalSearchService] ✅ ${journeys.length} trajets trouvés (maxTransfers=${maxTransfers})`);
 
-      for (const conn of directConnections) {
-        const durationMinutes = this.calculateDuration(conn.departure_time, conn.arrival_time);
-        const existing = bestConnectionByDestination.get(conn.to_stop_id);
+        for (const journey of journeys) {
+          const legs = journey.legs;
+          if (legs.length === 0) continue;
 
-        if (!existing || durationMinutes < existing.duration_minutes) {
-          bestConnectionByDestination.set(conn.to_stop_id, {
-            from_station_id: fromGTFSId,
-            to_station_id: conn.to_stop_id,
-            departure_time: conn.departure_time.slice(0, 5),
-            arrival_time: conn.arrival_time.slice(0, 5),
-            duration_minutes: durationMinutes,
-            route_name: conn.route_short_name || conn.route_long_name,
-            route_type: this.detectRouteType(conn.route_short_name || conn.route_long_name),
-            transfers: 0, // Direct = 0 correspondances
-          });
+          const firstLeg = legs[0];
+          const lastLeg = legs[legs.length - 1];
+          const destId = lastLeg.to_stop_id;
+          const durationMinutes = journey.totalDuration;
+
+          const existing = bestConnectionByDestination.get(destId);
+          if (!existing || durationMinutes < existing.duration_minutes) {
+            bestConnectionByDestination.set(destId, {
+              from_station_id: fromGTFSId,
+              to_station_id: destId,
+              departure_time: firstLeg.departure_time.slice(0, 5),
+              arrival_time: lastLeg.arrival_time ? lastLeg.arrival_time.slice(0, 5) : '00:00',
+              duration_minutes: durationMinutes,
+              route_name: `${legs.length} trains`,
+              route_type: 'TER',
+              transfers: legs.length - 1,
+              transferStation: legs.length > 1 ? legs[0].to_stop_name : undefined,
+              transferLat: legs.length > 1 ? legs[0].to_lat : undefined,
+              transferLon: legs.length > 1 ? legs[0].to_lon : undefined,
+              transferArrival: legs.length > 1 && legs[0].arrival_time ? legs[0].arrival_time.slice(0, 5) : undefined,
+              transferDeparture: legs.length > 1 && legs[1].departure_time ? legs[1].departure_time.slice(0, 5) : undefined,
+            });
+          }
+        }
+      } else {
+        // 1️⃣ CONNEXIONS DIRECTES (sans changement)
+        debugLog('[LocalSearchService] 📍 Étape 1/2: Connexions directes...');
+        debugLog(`[LocalSearchService] 🔍 Recherche depuis: ${fromGTFSId}`);
+        debugLog(`[LocalSearchService] 🕐 Plage horaire: ${departureTime} - ${timeRangeEnd}`);
+        const step1Start = Date.now();
+        const directConnections = await gtfsDbEnhanced.findAllDestinationsFrom(
+          fromGTFSId,
+          departureTime,
+          timeRangeEnd,
+          2000
+        );
+        const step1Time = Date.now() - step1Start;
+        debugLog(`[LocalSearchService] ✅ ${directConnections.length} connexions directes (${step1Time}ms)`);
+
+        if (directConnections.length === 0) {
+          console.warn('[LocalSearchService] ⚠️ AUCUNE connexion directe trouvée! Vérifiez:');
+          console.warn('  1. La base de données GTFS est-elle initialisée?');
+          console.warn('  2. La vue direct_connections contient-elle des données?');
+          console.warn('  3. Le stop_id de départ est-il correct?');
+        }
+
+        for (const conn of directConnections) {
+          const durationMinutes = this.calculateDuration(conn.departure_time, conn.arrival_time);
+          const existing = bestConnectionByDestination.get(conn.to_stop_id);
+
+          if (!existing || durationMinutes < existing.duration_minutes) {
+            bestConnectionByDestination.set(conn.to_stop_id, {
+              from_station_id: fromGTFSId,
+              to_station_id: conn.to_stop_id,
+              departure_time: conn.departure_time.slice(0, 5),
+              arrival_time: conn.arrival_time.slice(0, 5),
+              duration_minutes: durationMinutes,
+              route_name: conn.route_short_name || conn.route_long_name,
+              route_type: this.detectRouteType(conn.route_short_name || conn.route_long_name),
+              transfers: 0, // Direct = 0 correspondances
+            });
+          }
+        }
+
+        // 2️⃣ TRAJETS AVEC 1 CORRESPONDANCE - BULK OPTIMISÉ
+        if (maxTransfers >= 1) {
+          debugLog('[LocalSearchService] 🔄 Étape 2/2: Trajets avec 1 correspondance (BULK)...');
+          const step2Start = Date.now();
+          const oneTransferMap = await gtfsDbEnhanced.findAllDestinationsWithOneTransfer(
+            fromGTFSId,
+            departureTime,
+            timeRangeEnd,
+            120, // Max 2h d'attente entre les trains
+            5000, // Limite augmentée à 5000 trajets pour trouver plus de destinations
+            maxTime // Même limite de temps que pour les trajets directs
+          );
+          const step2Time = Date.now() - step2Start;
+          debugLog(`[LocalSearchService] ✅ ${oneTransferMap.size} destinations avec 1 correspondance (${step2Time}ms)`);
+
+          // Ajouter TOUTES les destinations avec 1 correspondance
+          // Cela inclut les destinations sans trajet direct ET celles avec un trajet direct plus lent
+          let transfersAdded = 0;
+          let transfersReplaced = 0;
+          let transfersSkipped = 0;
+
+          for (const [destId, journey] of oneTransferMap.entries()) {
+            const existing = bestConnectionByDestination.get(destId);
+
+            // Toujours ajouter le trajet avec correspondance s'il n'existe pas
+            // OU s'il est plus rapide que le trajet direct existant
+            if (!existing) {
+              // Pas de trajet direct vers cette destination, ajouter le trajet avec correspondance
+              bestConnectionByDestination.set(destId, {
+                from_station_id: fromGTFSId,
+                to_station_id: destId,
+                departure_time: journey.departureTime || '08:00',
+                arrival_time: journey.arrivalTime || '10:00',
+                duration_minutes: journey.totalDuration,
+                route_name: '2 trains', // Indique qu'il y a 2 segments
+                route_type: 'TER',
+                transfers: 1, // 1 correspondance
+                transferStation: journey.transferStation,
+                transferLat: journey.transferLat,
+                transferLon: journey.transferLon,
+                // Horaires de correspondance
+                transferArrival: journey.transferArrival,
+                transferDeparture: journey.transferDeparture,
+              });
+              transfersAdded++;
+            } else if (journey.totalDuration < existing.duration_minutes) {
+              // Le trajet avec correspondance est plus rapide, remplacer
+              bestConnectionByDestination.set(destId, {
+                from_station_id: fromGTFSId,
+                to_station_id: destId,
+                departure_time: journey.departureTime || '08:00',
+                arrival_time: journey.arrivalTime || '10:00',
+                duration_minutes: journey.totalDuration,
+                route_name: '2 trains',
+                route_type: 'TER',
+                transfers: 1,
+                transferStation: journey.transferStation,
+                transferLat: journey.transferLat,
+                transferLon: journey.transferLon,
+                // Horaires de correspondance
+                transferArrival: journey.transferArrival,
+                transferDeparture: journey.transferDeparture,
+              });
+              transfersReplaced++;
+            } else {
+              // Le trajet direct est plus rapide, on garde le trajet direct
+              transfersSkipped++;
+            }
+          }
+
+          debugLog(`[LocalSearchService] 📊 Correspondances: ${transfersAdded} ajoutées, ${transfersReplaced} remplacent un direct, ${transfersSkipped} ignorées (direct plus rapide)`);
         }
       }
-
-      // 2️⃣ TRAJETS AVEC 1 CORRESPONDANCE - BULK OPTIMISÉ
-      debugLog('[LocalSearchService] 🔄 Étape 2/2: Trajets avec 1 correspondance (BULK)...');
-      const step2Start = Date.now();
-      const oneTransferMap = await gtfsDbEnhanced.findAllDestinationsWithOneTransfer(
-        fromGTFSId,
-        departureTime,
-        timeRangeEnd,
-        120, // Max 2h d'attente entre les trains
-        5000, // Limite augmentée à 5000 trajets pour trouver plus de destinations
-        maxTime // Même limite de temps que pour les trajets directs
-      );
-      const step2Time = Date.now() - step2Start;
-      debugLog(`[LocalSearchService] ✅ ${oneTransferMap.size} destinations avec 1 correspondance (${step2Time}ms)`);
-
-      // Ajouter TOUTES les destinations avec 1 correspondance
-      // Cela inclut les destinations sans trajet direct ET celles avec un trajet direct plus lent
-      let transfersAdded = 0;
-      let transfersReplaced = 0;
-      let transfersSkipped = 0;
-
-      for (const [destId, journey] of oneTransferMap.entries()) {
-        const existing = bestConnectionByDestination.get(destId);
-
-        // Toujours ajouter le trajet avec correspondance s'il n'existe pas
-        // OU s'il est plus rapide que le trajet direct existant
-        if (!existing) {
-          // Pas de trajet direct vers cette destination, ajouter le trajet avec correspondance
-          bestConnectionByDestination.set(destId, {
-            from_station_id: fromGTFSId,
-            to_station_id: destId,
-            departure_time: journey.departureTime || '08:00',
-            arrival_time: journey.arrivalTime || '10:00',
-            duration_minutes: journey.totalDuration,
-            route_name: '2 trains', // Indique qu'il y a 2 segments
-            route_type: 'TER',
-            transfers: 1, // 1 correspondance
-            transferStation: journey.transferStation,
-            transferLat: journey.transferLat,
-            transferLon: journey.transferLon,
-            // Horaires de correspondance
-            transferArrival: journey.transferArrival,
-            transferDeparture: journey.transferDeparture,
-          });
-          transfersAdded++;
-        } else if (journey.totalDuration < existing.duration_minutes) {
-          // Le trajet avec correspondance est plus rapide, remplacer
-          bestConnectionByDestination.set(destId, {
-            from_station_id: fromGTFSId,
-            to_station_id: destId,
-            departure_time: journey.departureTime || '08:00',
-            arrival_time: journey.arrivalTime || '10:00',
-            duration_minutes: journey.totalDuration,
-            route_name: '2 trains',
-            route_type: 'TER',
-            transfers: 1,
-            transferStation: journey.transferStation,
-            transferLat: journey.transferLat,
-            transferLon: journey.transferLon,
-            // Horaires de correspondance
-            transferArrival: journey.transferArrival,
-            transferDeparture: journey.transferDeparture,
-          });
-          transfersReplaced++;
-        } else {
-          // Le trajet direct est plus rapide, on garde le trajet direct
-          transfersSkipped++;
-        }
-      }
-
-      debugLog(`[LocalSearchService] 📊 Correspondances: ${transfersAdded} ajoutées, ${transfersReplaced} remplacent un direct, ${transfersSkipped} ignorées (direct plus rapide)`);
 
       debugLog(`[LocalSearchService] 📊 ${bestConnectionByDestination.size} destinations uniques trouvées`);
 
@@ -596,14 +693,48 @@ export class LocalSearchService {
         }
 
         // ===== CALCUL DE DISTANCE ET PRIX (UNE SEULE FOIS) =====
-        // Calculer la distance et le prix maintenant pour pouvoir les réutiliser
         const distance = LocationService.calculateDistance(
           fromStation.lat,
           fromStation.lon,
           toStation.lat,
           toStation.lon
         );
-        const priceEstimate = PriceEstimationService.estimatePrice(distance, durationMinutes);
+
+        let priceEstimate: { min: number; max: number; average: number; isReal?: boolean };
+
+        if (
+          conn.transfers && conn.transfers > 0 &&
+          conn.transferLat && conn.transferLon &&
+          conn.transferArrival && conn.transferDeparture
+        ) {
+          // Trajets avec correspondance : sommer le prix des 2 tronçons
+          const leg1Distance = LocationService.calculateDistance(
+            fromStation.lat, fromStation.lon,
+            conn.transferLat, conn.transferLon
+          );
+          const leg2Distance = LocationService.calculateDistance(
+            conn.transferLat, conn.transferLon,
+            toStation.lat, toStation.lon
+          );
+          const leg1Duration = this.calculateDuration(conn.departure_time, conn.transferArrival);
+          const leg2Duration = this.calculateDuration(conn.transferDeparture, conn.arrival_time);
+
+          const leg1Price = PriceEstimationService.estimatePrice(leg1Distance, leg1Duration);
+          const leg2Price = PriceEstimationService.estimatePrice(leg2Distance, leg2Duration);
+
+          priceEstimate = {
+            min: leg1Price.min + leg2Price.min,
+            max: leg1Price.max + leg2Price.max,
+            average: leg1Price.average + leg2Price.average,
+          };
+        } else {
+          priceEstimate = PriceEstimationService.getPrice(
+            fromStation.sncf_id,
+            toStation.sncf_id,
+            distance,
+            durationMinutes
+          );
+        }
 
         // Utiliser priceRange.max pour le filtre budget (le prix max possible)
         if (mode === 'budget' && maxBudget && priceEstimate.max > maxBudget) {

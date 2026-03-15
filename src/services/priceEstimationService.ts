@@ -1,7 +1,9 @@
 /**
  * Service d'estimation des prix de train
- * Basé sur les tarifs SNCF 2024-2025 et la distance parcourue
+ * Utilise en priorité les vrais tarifs SNCF téléchargés depuis data.sncf.com
+ * et se rabat sur un algorithme distance/vitesse si les données sont absentes.
  */
+import { tariffService } from './tariffService';
 
 export class PriceEstimationService {
   // Cache pour les estimations de prix (évite les recalculs)
@@ -135,6 +137,28 @@ export class PriceEstimationService {
     }
 
     return result;
+  }
+
+  /**
+   * Retourne le prix réel (tarifs SNCF) ou une estimation si non disponible.
+   * @param fromUIC8 sncf_id de la gare de départ (ex: "87686006")
+   * @param toUIC8   sncf_id de la gare d'arrivée
+   * @param distance Distance en km (utilisée pour le fallback)
+   * @param duration Durée en minutes (utilisée pour le fallback)
+   */
+  static getPrice(
+    fromUIC8: string,
+    toUIC8: string,
+    distance: number,
+    duration: number
+  ): { average: number; min: number; max: number; isReal: boolean } {
+    const real = tariffService.getPrice(fromUIC8, toUIC8);
+    if (real) {
+      const average = Math.round((real.min + real.max) / 2);
+      return { average, min: real.min, max: real.max, isReal: true };
+    }
+    const est = this.estimatePrice(distance, duration);
+    return { ...est, isReal: false };
   }
 
   /**

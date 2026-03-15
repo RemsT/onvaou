@@ -13,6 +13,7 @@ import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigatorSimple';
 
 type DestinationDetailRouteProp = RouteProp<
@@ -24,7 +25,7 @@ type DestinationDetailNavigationProp = StackNavigationProp<RootStackParamList>;
 export default function DestinationDetailScreen() {
   const route = useRoute<DestinationDetailRouteProp>();
   const navigation = useNavigation<DestinationDetailNavigationProp>();
-  const { destination, searchDate } = route.params;
+  const { destination, searchDate, mapParams } = route.params;
   const [mapReady, setMapReady] = useState(false);
 
   /**
@@ -173,6 +174,26 @@ export default function DestinationDetailScreen() {
           <Text style={styles.stationName}>
             {destination.to_station.real_name || destination.to_station.name}
           </Text>
+          <TouchableOpacity
+            style={styles.mapButton}
+            onPress={() => {
+              if (mapParams) {
+                navigation.navigate('MapView', {
+                  fromStation: mapParams.fromStation,
+                  results: mapParams.results,
+                  mode: mapParams.mode,
+                  maxValue: mapParams.maxValue,
+                  searchDate,
+                  maxTransfers: mapParams.maxTransfers,
+                });
+              } else {
+                navigation.goBack();
+              }
+            }}
+          >
+            <Ionicons name="map-outline" size={16} color="#4CAF50" />
+            <Text style={styles.mapButtonText}>Carte des destinations</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Infos principales - Sur une seule ligne */}
@@ -187,9 +208,11 @@ export default function DestinationDetailScreen() {
 
             {destination.price && (
               <View style={styles.infoCardCompact}>
-                <Text style={styles.infoLabel}>Prix estimé</Text>
+                <Text style={styles.infoLabel}>Prix indicatif</Text>
                 <Text style={styles.infoValue}>
-                  {destination.price.toFixed(2)}€
+                  {destination.priceRange
+                    ? `${destination.priceRange.min}€ – ${destination.priceRange.max}€`
+                    : `${destination.price.toFixed(0)}€`}
                 </Text>
               </View>
             )}
@@ -206,12 +229,12 @@ export default function DestinationDetailScreen() {
             })}
           </Text>
           <View style={styles.timelineContainer}>
-            {/* Départ */}
+            {/* Départ — bleu */}
             <View style={styles.timelineItem}>
-              <View style={styles.timelineDot} />
+              <View style={[styles.timelineDot, styles.timelineDotDeparture]} />
               <View style={styles.timelineContent}>
                 <View style={styles.timelineRow}>
-                  <Text style={styles.timelineTime}>
+                  <Text style={[styles.timelineTime, styles.timelineTimeDeparture]}>
                     {departureTime.toLocaleTimeString('fr-FR', {
                       hour: '2-digit',
                       minute: '2-digit',
@@ -229,24 +252,22 @@ export default function DestinationDetailScreen() {
 
             <View style={styles.timelineLine} />
 
-            {/* Correspondance si présente */}
+            {/* Correspondance — orange */}
             {destination.transfers !== undefined && destination.transfers > 0 && destination.transferStation && (
               <>
-                {/* Arrivée à la gare de correspondance */}
                 <View style={styles.timelineItem}>
                   <View style={[styles.timelineDot, styles.timelineDotTransfer]} />
                   <View style={styles.timelineContent}>
                     <View style={styles.timelineRow}>
                       {destination.transferArrival && (
-                        <Text style={styles.timelineTimeTransfer}>
-                          {destination.transferArrival}
+                        <Text style={styles.timelineTime}>
+                          {destination.transferArrival.slice(0, 5)}
                         </Text>
                       )}
                       <Text style={styles.timelineStationBold}>
                         {destination.transferStation}
                       </Text>
                     </View>
-                    {/* Temps d'attente sous l'heure d'arrivée */}
                     {destination.transferArrival && destination.transferDeparture && (() => {
                       const [arrH, arrM] = destination.transferArrival.split(':').map(Number);
                       const [depH, depM] = destination.transferDeparture.split(':').map(Number);
@@ -255,7 +276,7 @@ export default function DestinationDetailScreen() {
                       const waitMins = waitMinutes % 60;
                       return (
                         <Text style={styles.waitTime}>
-                          Attente: {waitHours}h{waitMins.toString().padStart(2, '0')}
+                          Correspondance · {waitHours > 0 ? `${waitHours}h` : ''}{waitMins.toString().padStart(2, '0')}min d'attente
                         </Text>
                       );
                     })()}
@@ -263,14 +284,13 @@ export default function DestinationDetailScreen() {
                 </View>
                 <View style={styles.timelineLine} />
 
-                {/* Départ de la gare de correspondance */}
                 <View style={styles.timelineItem}>
                   <View style={[styles.timelineDot, styles.timelineDotTransfer]} />
                   <View style={styles.timelineContent}>
                     <View style={styles.timelineRow}>
                       {destination.transferDeparture && (
-                        <Text style={styles.timelineTimeTransfer}>
-                          {destination.transferDeparture}
+                        <Text style={styles.timelineTime}>
+                          {destination.transferDeparture.slice(0, 5)}
                         </Text>
                       )}
                       <Text style={styles.timelineStationBold}>
@@ -283,9 +303,9 @@ export default function DestinationDetailScreen() {
               </>
             )}
 
-            {/* Arrivée */}
+            {/* Arrivée — rouge */}
             <View style={styles.timelineItem}>
-              <View style={styles.timelineDot} />
+              <View style={[styles.timelineDot, styles.timelineDotArrival]} />
               <View style={styles.timelineContent}>
                 <View style={styles.timelineRow}>
                   <Text style={styles.timelineTime}>
@@ -298,9 +318,7 @@ export default function DestinationDetailScreen() {
                     {destination.to_station.real_name || destination.to_station.name}
                   </Text>
                 </View>
-                <Text style={styles.timelineLabel}>
-                  Arrivée
-                </Text>
+                <Text style={styles.timelineLabel}>Arrivée</Text>
               </View>
             </View>
           </View>
@@ -403,12 +421,30 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 20,
     marginTop: 10,
+    alignItems: 'center',
   },
   stationName: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#000000',
     textAlign: 'center',
+    marginBottom: 8,
+  },
+  mapButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    backgroundColor: '#E8F5E9',
+  },
+  mapButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4CAF50',
   },
   section: {
     marginBottom: 20,
@@ -499,8 +535,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontStyle: 'italic',
   },
+  // Couleurs par rôle (identiques à la carte)
+  timelineDotDeparture: {
+    backgroundColor: '#2196F3',
+  },
   timelineDotTransfer: {
-    backgroundColor: '#FFB74D',
+    backgroundColor: '#FF9800',
+  },
+  timelineDotArrival: {
+    backgroundColor: '#F44336',
   },
   transferBadge: {
     backgroundColor: '#FFF3E0',
@@ -517,16 +560,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#F57C00',
   },
-  timelineTimeTransfer: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#F57C00',
-    marginBottom: 2,
-  },
   waitTime: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#F57C00',
+    color: '#5F6368',
     marginTop: 4,
     fontStyle: 'italic',
   },

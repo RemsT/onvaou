@@ -1,11 +1,12 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
-import MapView, { Marker, Callout } from 'react-native-maps';
+import MapView, { Marker } from 'react-native-maps';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -15,12 +16,20 @@ import { SearchResult } from '../types';
 type MapScreenRouteProp = RouteProp<RootStackParamList, 'MapView'>;
 type MapScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
+const CARD_WIDTH = 220;
+const CARD_MARGIN = 16;
+const POINTER_OFFSET = 12; // space between marker and card bottom
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 export default function MapScreen() {
   const route = useRoute<MapScreenRouteProp>();
   const navigation = useNavigation<MapScreenNavigationProp>();
   const mapRef = useRef<MapView>(null);
 
-  const { fromStation, results, mode, maxValue, searchDate } = route.params;
+  const { fromStation, results, mode, maxValue, searchDate, maxTransfers } = route.params;
+  const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
+  const [cardPosition, setCardPosition] = useState<{ x: number; y: number } | null>(null);
+  const [cardHeight, setCardHeight] = useState(70);
 
   // Calculer la région initiale pour centrer la carte
   const initialRegion = {
@@ -33,12 +42,8 @@ export default function MapScreen() {
   // Fonction pour ajuster le zoom sur toutes les destinations
   const fitToAllDestinations = () => {
     if (mapRef.current && results.length > 0) {
-      // Créer un tableau de toutes les coordonnées (départ + destinations)
       const coordinates = [
-        {
-          latitude: fromStation.lat,
-          longitude: fromStation.lon,
-        },
+        { latitude: fromStation.lat, longitude: fromStation.lon },
         ...results.map(result => ({
           latitude: result.to_station.lat,
           longitude: result.to_station.lon,
@@ -46,12 +51,7 @@ export default function MapScreen() {
       ];
 
       mapRef.current.fitToCoordinates(coordinates, {
-        edgePadding: {
-          top: 100,
-          right: 50,
-          bottom: 300, // Plus d'espace en bas pour la carte d'info
-          left: 50,
-        },
+        edgePadding: { top: 100, right: 50, bottom: 300, left: 50 },
         animated: true,
       });
     }
@@ -61,10 +61,8 @@ export default function MapScreen() {
   const uniqueResults = results.reduce((acc, result) => {
     const existingIndex = acc.findIndex(r => r.to_station.id === result.to_station.id);
     if (existingIndex === -1) {
-      // Nouvelle destination, l'ajouter
       acc.push(result);
     } else {
-      // Destination existante, garder celle avec la durée la plus courte
       if (result.duration < acc[existingIndex].duration) {
         acc[existingIndex] = result;
       }
@@ -75,39 +73,63 @@ export default function MapScreen() {
   // Ajuster le zoom automatiquement au chargement
   useEffect(() => {
     if (results.length > 0) {
-      // Attendre que la carte soit prête puis ajuster le zoom
-      setTimeout(() => {
-        fitToAllDestinations();
-      }, 500); // Délai pour s'assurer que la carte est montée
+      setTimeout(() => { fitToAllDestinations(); }, 500);
     }
   }, [results, fromStation]);
 
+  const handleMarkerPress = async (result: SearchResult, e: any) => {
+    e.stopPropagation();
+    setSelectedResult(result);
+    if (mapRef.current) {
+      const point = await mapRef.current.pointForCoordinate({
+        latitude: result.to_station.lat,
+        longitude: result.to_station.lon,
+      });
+      setCardPosition(point);
+    }
+  };
+
+  // Position horizontale de la carte (centrée sur le marqueur, clampée aux bords)
+  const cardLeft = cardPosition
+    ? Math.max(CARD_MARGIN, Math.min(SCREEN_WIDTH - CARD_WIDTH - CARD_MARGIN, cardPosition.x - CARD_WIDTH / 2))
+    : 0;
+
+  // Position verticale : au-dessus du marqueur par défaut, en-dessous si trop près du haut
+  const showAbove = cardPosition ? cardPosition.y - cardHeight - POINTER_OFFSET > 60 : true;
+  const cardTop = cardPosition
+    ? showAbove
+      ? cardPosition.y - cardHeight - POINTER_OFFSET
+      : cardPosition.y + POINTER_OFFSET + 10
+    : 0;
+
+  // Offset horizontal de la pointe (pour la pointer vers le marqueur)
+  const pointerLeft = cardPosition
+    ? Math.max(12, Math.min(CARD_WIDTH - 24, cardPosition.x - cardLeft - 8))
+    : CARD_WIDTH / 2 - 8;
+
   return (
     <View style={styles.container}>
-      {/* Carte plein écran avec MapView native */}
+      {/* Carte plein écran */}
       <MapView
         ref={mapRef}
         style={styles.map}
         initialRegion={initialRegion}
+        onPress={() => { setSelectedResult(null); setCardPosition(null); }}
       >
         {/* Point bleu pour la gare de départ */}
         <Marker
-          coordinate={{
-            latitude: fromStation.lat,
-            longitude: fromStation.lon,
-          }}
+          coordinate={{ latitude: fromStation.lat, longitude: fromStation.lon }}
           title={fromStation.name}
           description="Gare de départ"
           anchor={{ x: 0.5, y: 0.5 }}
+          tracksViewChanges={false}
         >
           <View style={styles.blueMarker} />
         </Marker>
 
-        {/* Points rouges pour les destinations (exclure la gare de départ) */}
+        {/* Points rouges pour les destinations */}
         {uniqueResults
-          .filter(result =>
-            result.to_station.id !== fromStation.id
-          )
+          .filter(result => result.to_station.id !== fromStation.id)
           .map((result, index) => (
             <Marker
               key={`marker-${result.to_station.id}-${index}`}
@@ -116,57 +138,87 @@ export default function MapScreen() {
                 longitude: result.to_station.lon,
               }}
               anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={selectedResult?.to_station.id === result.to_station.id}
+              onPress={(e) => handleMarkerPress(result, e)}
             >
-              <View style={styles.redMarker} />
-              <Callout
-                onPress={() => {
-                  navigation.navigate('DestinationDetail', {
-                    destination: result,
-                    searchDate,
-                  });
-                }}
-                style={styles.callout}
-              >
-                <View style={styles.calloutContainer}>
-                  <Text style={styles.calloutTitle}>{result.to_station.name}</Text>
-                  <Text style={styles.calloutDescription}>
-                    {result.duration} min - {result.price.toFixed(2)}€
-                  </Text>
-                  <View style={styles.calloutIconContainer}>
-                    <Text style={styles.calloutIcon}>→</Text>
-                  </View>
-                </View>
-              </Callout>
+              <View style={[
+                styles.redMarker,
+                selectedResult?.to_station.id === result.to_station.id && styles.redMarkerSelected,
+              ]} />
             </Marker>
           ))}
       </MapView>
 
       {/* Bouton pour recentrer la carte */}
-      <TouchableOpacity
-        style={styles.recenterButton}
-        onPress={fitToAllDestinations}
-      >
+      <TouchableOpacity style={styles.recenterButton} onPress={fitToAllDestinations}>
         <Text style={styles.recenterIcon}>⊕</Text>
       </TouchableOpacity>
 
-      {/* Informations en bas */}
-      <View style={styles.infoCard}>
-        <Text style={styles.infoCardTitle}>
-          Depuis {fromStation.name}
-        </Text>
-        <Text style={styles.infoCardText}>
-          {results.length} destination{results.length > 1 ? 's' : ''} trouvée{results.length > 1 ? 's' : ''}
-        </Text>
-        {mode === 'time' && maxValue && (
-          <Text style={styles.infoCardText}>
-            Temps max: {Math.floor(maxValue / 60)}h
-            {maxValue % 60 > 0 ? ` ${maxValue % 60}min` : ''}
-          </Text>
-        )}
-        {mode === 'budget' && maxValue && (
-          <Text style={styles.infoCardText}>Budget max: {maxValue}€</Text>
-        )}
-      </View>
+      {/* Encadré flottant ancré sur la destination sélectionnée */}
+      {selectedResult && cardPosition && (
+        <TouchableOpacity
+          style={[styles.selectedCard, { left: cardLeft, top: cardTop, width: CARD_WIDTH }]}
+          onLayout={(e) => setCardHeight(e.nativeEvent.layout.height)}
+          onPress={() => navigation.navigate('DestinationDetail', {
+            destination: selectedResult,
+            searchDate,
+            mapParams: { fromStation, results, mode, maxValue, maxTransfers },
+          })}
+          activeOpacity={0.8}
+        >
+          <View style={styles.selectedCardContent}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.selectedCardTitle} numberOfLines={1}>
+                {selectedResult.to_station.name}
+              </Text>
+              <Text style={styles.selectedCardDesc}>
+                {Math.floor(selectedResult.duration / 60)}h
+                {selectedResult.duration % 60 > 0 ? `${selectedResult.duration % 60}min` : ''}
+                {selectedResult.priceRange
+                  ? ` · ${selectedResult.priceRange.min}€–${selectedResult.priceRange.max}€`
+                  : selectedResult.price ? ` · ${selectedResult.price.toFixed(0)}€` : ''}
+              </Text>
+            </View>
+            <Text style={styles.selectedCardArrow}>›</Text>
+          </View>
+          {/* Pointe vers le marqueur */}
+          {showAbove && (
+            <View style={[styles.pointer, { left: pointerLeft }]} />
+          )}
+          {!showAbove && (
+            <View style={[styles.pointerUp, { left: pointerLeft }]} />
+          )}
+        </TouchableOpacity>
+      )}
+
+      {/* Informations en bas — tout l'encadré est cliquable */}
+      <TouchableOpacity
+        style={styles.infoCard}
+        onPress={() => navigation.navigate('ResultsList', {
+          fromStation,
+          results,
+          mode,
+          maxValue,
+          searchDate,
+          maxTransfers,
+        })}
+        activeOpacity={0.8}
+      >
+        <View style={styles.infoCardRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.infoCardTitle}>Depuis {fromStation.name}</Text>
+            <Text style={styles.infoCardText}>
+              {results.length} destination{results.length > 1 ? 's' : ''} trouvée{results.length > 1 ? 's' : ''}
+              {mode === 'time' && maxValue
+                ? ` · ${Math.floor(maxValue / 60)}h${maxValue % 60 > 0 ? `${maxValue % 60}` : ''} max`
+                : mode === 'budget' && maxValue
+                ? ` · ${maxValue}€ max`
+                : ''}
+            </Text>
+          </View>
+          <Text style={styles.infoCardArrow}>›</Text>
+        </View>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -204,33 +256,71 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
   },
-  callout: {
-    width: 200,
+  redMarkerSelected: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 3,
   },
-  calloutContainer: {
-    padding: 8,
-    paddingRight: 28,
-    position: 'relative',
+  selectedCard: {
+    position: 'absolute',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E8EAED',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  calloutTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  selectedCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  selectedCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
     color: '#0C3823',
     marginBottom: 2,
   },
-  calloutDescription: {
-    fontSize: 15,
+  selectedCardDesc: {
+    fontSize: 12,
     color: '#5F6368',
   },
-  calloutIconContainer: {
-    position: 'absolute',
-    bottom: 6,
-    right: 6,
-  },
-  calloutIcon: {
+  selectedCardArrow: {
     fontSize: 22,
     color: '#4CAF50',
     fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  // Pointe vers le bas (carte au-dessus du marqueur)
+  pointer: {
+    position: 'absolute',
+    bottom: -8,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: '#FFFFFF',
+  },
+  // Pointe vers le haut (carte en-dessous du marqueur)
+  pointerUp: {
+    position: 'absolute',
+    top: -8,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderBottomWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#FFFFFF',
   },
   infoCard: {
     position: 'absolute',
@@ -238,7 +328,7 @@ const styles = StyleSheet.create({
     left: 20,
     right: 20,
     backgroundColor: '#FFFFFF',
-    padding: 18,
+    padding: 16,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#E8EAED',
@@ -248,16 +338,25 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
-  infoCardTitle: {
-    fontSize: 16,
+  infoCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  infoCardArrow: {
+    fontSize: 28,
+    color: '#4CAF50',
     fontWeight: 'bold',
+  },
+  infoCardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
     color: '#0C3823',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   infoCardText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#5F6368',
-    marginBottom: 4,
   },
   recenterButton: {
     position: 'absolute',

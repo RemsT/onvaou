@@ -38,13 +38,11 @@ export default function StationLabels({
             ]}
           >
             {!compact && <Text style={styles.labelIcon}>{labelInfo.icon}</Text>}
-            <Text style={[
-              styles.labelText,
-              compact && styles.labelTextCompact,
-              { color: labelInfo.color }
-            ]}>
-              {labelInfo.name}
-            </Text>
+            {!compact && (
+              <Text style={[styles.labelText, { color: labelInfo.color }]}>
+                {labelInfo.name}
+              </Text>
+            )}
           </View>
         );
       })}

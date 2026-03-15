@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -22,9 +22,10 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigatorSimple';
 import { LocalStationService } from '../services/localStationService';
 import { HybridSearchService } from '../services/hybridSearchService';
-import { gtfsInitService, InitializationProgress } from '../services/gtfsInitializationService';
+import { useGTFSInitialization } from '../hooks/useGTFSInitialization';
 import { DatabaseInitializationScreen } from '../components/DatabaseInitializationScreen';
 import { Station, CityLabel } from '../types';
+import { Ionicons } from '@expo/vector-icons';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -48,13 +49,11 @@ export default function HomeScreen() {
   const [timeRangeEnd, setTimeRangeEnd] = useState<string>('20:00');
   // Checkbox pour les correspondances (par défaut cochée)
   const [includeTransfers, setIncludeTransfers] = useState(true);
-  // État pour l'initialisation de la base de données
-  const [isInitializing, setIsInitializing] = useState(false);
-  const [initProgress, setInitProgress] = useState<InitializationProgress>({
-    step: 'start',
-    progress: 0,
-    message: 'Démarrage...'
-  });
+  const stationInputRef = useRef<any>(null);
+
+  // Initialisation de la base de données GTFS
+  const { isInitializing, progress: initProgress, initializeDatabase, isGTFSStale } = useGTFSInitialization();
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const handleStationSearch = async (text: string) => {
     setStationSearch(text);
@@ -144,6 +143,8 @@ export default function HomeScreen() {
     try {
       const searchMode = enableTimeFilter && enableBudgetFilter ? 'both' : enableTimeFilter ? 'time' : 'budget';
 
+      const maxTransfers = includeTransfers ? 1 : 0;
+
       const results = await HybridSearchService.searchDestinations(
         fromStation,
         searchMode,
@@ -152,7 +153,8 @@ export default function HomeScreen() {
         selectedDate || undefined,
         selectedLabels.length > 0 ? selectedLabels : undefined,
         timeRangeStart,
-        timeRangeEnd
+        timeRangeEnd,
+        maxTransfers
       );
 
       // Filtrer les résultats selon les checkboxes de correspondances
@@ -165,12 +167,13 @@ export default function HomeScreen() {
         return transfers === 0;
       });
 
-      navigation.navigate('ResultsList', {
+      navigation.navigate('MapView', {
         fromStation,
         results: filteredResults,
         mode: searchMode,
         maxValue: timeValue || budgetValue,
         searchDate: (selectedDate || new Date()).getTime(),
+        maxTransfers,
       });
     } catch (error) {
       Alert.alert('Erreur', 'Impossible de récupérer les destinations');
@@ -193,6 +196,29 @@ export default function HomeScreen() {
     return `${hours}h${minutes}`;
   };
 
+  const handleUpdateData = () => {
+    Alert.alert(
+      'Mettre à jour les données',
+      'Les horaires GTFS ont plus de 6 mois. Mettre à jour télécharge les données les plus récentes depuis data.sncf.com (connexion internet requise, peut prendre quelques minutes).',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Mettre à jour',
+          onPress: async () => {
+            setIsUpdating(true);
+            try {
+              await initializeDatabase(false, true);
+            } catch (error) {
+              Alert.alert('Erreur', 'Impossible de mettre à jour les données. Vérifiez votre connexion.');
+            } finally {
+              setIsUpdating(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleResetDatabase = async () => {
     Alert.alert(
       'Réinitialiser la base de données',
@@ -203,46 +229,12 @@ export default function HomeScreen() {
           text: 'Réinitialiser',
           style: 'destructive',
           onPress: async () => {
-            setIsInitializing(true);
-            setInitProgress({
-              step: 'start',
-              progress: 0,
-              message: 'Démarrage de la réinitialisation...'
-            });
-
             try {
-              await gtfsInitService.resetDatabase();
-
-              // Passer le callback de progression
-              await gtfsInitService.initializeDatabase((progress) => {
-                setInitProgress(progress);
-              });
-
-              setInitProgress({
-                step: 'complete',
-                progress: 100,
-                message: 'Base de données réinitialisée avec succès !'
-              });
-
-              // Attendre 2 secondes pour montrer le message de succès
-              setTimeout(() => {
-                setIsInitializing(false);
-                Alert.alert('Succès', 'Base de données réinitialisée avec succès !');
-              }, 2000);
+              await initializeDatabase(true);
+              Alert.alert('Succès', 'Base de données réinitialisée avec succès !');
             } catch (error) {
-              setInitProgress({
-                step: 'error',
-                progress: 0,
-                message: error instanceof Error ? error.message : 'Erreur inconnue'
-              });
-
-              // Attendre 3 secondes avant de fermer l'écran d'erreur
-              setTimeout(() => {
-                setIsInitializing(false);
-                Alert.alert('Erreur', 'Échec de la réinitialisation de la base de données');
-              }, 3000);
-
               console.error(error);
+              Alert.alert('Erreur', 'Échec de la réinitialisation de la base de données');
             }
           }
         }
@@ -283,10 +275,9 @@ export default function HomeScreen() {
             <View style={styles.selectedStationCard}>
               <View style={styles.stationInfo}>
                 <Text style={styles.stationName}>{fromStation.name}</Text>
-                <Text style={styles.stationLabel}>Départ</Text>
               </View>
               <TouchableOpacity
-                onPress={() => setFromStation(null)}
+                onPress={() => { setFromStation(null); setTimeout(() => stationInputRef.current?.focus(), 100); }}
                 style={styles.changeButton}
                 disabled={loading}
               >
@@ -297,6 +288,7 @@ export default function HomeScreen() {
             <>
               <View style={styles.searchInputContainer}>
                 <TextInput
+                  ref={stationInputRef}
                   style={styles.searchInput}
                   placeholder="Ex: Paris, Lyon, Marseille..."
                   placeholderTextColor="#999"
@@ -329,7 +321,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Date & Time Range Card */}
-        <View style={styles.card}>
+        <View style={[styles.card, loading && styles.filterRowDisabled]}>
           <Text style={styles.cardTitle}>Date et heure de départ</Text>
           <CustomDateTimePicker
             value={selectedDate}
@@ -449,6 +441,7 @@ export default function HomeScreen() {
               </View>
             </TouchableOpacity>
           </View>
+
         </View>
 
         {/* Search Button */}
@@ -471,11 +464,42 @@ export default function HomeScreen() {
         </TouchableOpacity>
 
         {/* Info Card */}
-        <View style={styles.infoCard}>
-          <Text style={styles.infoText}>
-            Sélectionnez un ou plusieurs filtres pour trouver les destinations accessibles depuis votre gare
-          </Text>
-        </View>
+        {!loading && (
+          <View style={styles.infoCard}>
+            <Text style={styles.infoText}>
+              Sélectionnez un ou plusieurs filtres pour trouver les destinations accessibles depuis votre gare
+            </Text>
+          </View>
+        )}
+
+        {/* Disclaimer affiché uniquement pendant la recherche */}
+        {loading && (
+          <View style={styles.searchingDisclaimer}>
+            <Text style={styles.searchingDisclaimerText}>
+              Horaires théoriques · Prix indicatifs
+            </Text>
+            <Text style={styles.searchingDisclaimerSub}>
+              Consultez SNCF Connect pour les horaires et tarifs exacts
+            </Text>
+          </View>
+        )}
+
+        {/* Bannière de mise à jour des données GTFS */}
+        {isGTFSStale && (
+          <TouchableOpacity
+            style={[styles.updateBanner, isUpdating && styles.updateBannerDisabled]}
+            onPress={handleUpdateData}
+            disabled={loading || isUpdating}
+          >
+            <Ionicons name="refresh" size={22} color="#1565C0" style={styles.updateBannerIcon} />
+            <View style={styles.updateBannerContent}>
+              <Text style={styles.updateBannerTitle}>Données horaires datées</Text>
+              <Text style={styles.updateBannerText}>
+                Les horaires ont plus de 6 mois. Appuyez pour télécharger les données à jour depuis SNCF.
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* Reset Database Button */}
         <TouchableOpacity
@@ -483,7 +507,10 @@ export default function HomeScreen() {
           onPress={handleResetDatabase}
           disabled={loading}
         >
-          <Text style={styles.resetButtonText}>⚙️ Réinitialiser la base de données</Text>
+          <View style={styles.resetButtonContent}>
+            <Ionicons name="settings-outline" size={15} color="#8E8E93" />
+            <Text style={styles.resetButtonText}>Réinitialiser la base de données</Text>
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -810,9 +837,65 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 10,
   },
+  resetButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   resetButtonText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
+  },
+
+  // Disclaimer affiché pendant la recherche
+  searchingDisclaimer: {
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  searchingDisclaimerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#5F6368',
+  },
+  searchingDisclaimerSub: {
+    fontSize: 11,
+    color: '#9E9E9E',
+    marginTop: 3,
+    textAlign: 'center',
+  },
+
+  // Bannière de mise à jour GTFS
+  updateBanner: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#2196F3',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  updateBannerDisabled: {
+    opacity: 0.5,
+  },
+  updateBannerIcon: {
+    marginRight: 4,
+  },
+  updateBannerContent: {
+    flex: 1,
+  },
+  updateBannerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0D47A1',
+    marginBottom: 2,
+  },
+  updateBannerText: {
+    fontSize: 11,
+    color: '#1565C0',
+    lineHeight: 16,
   },
 });

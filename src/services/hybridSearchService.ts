@@ -54,7 +54,8 @@ export class HybridSearchService {
     datetime?: Date,
     selectedLabels?: CityLabel[],
     timeRangeStart?: string,
-    timeRangeEnd?: string
+    timeRangeEnd?: string,
+    maxTransfers: number = 1 // 0 = direct only, 1 = at most 1 transfer, 2 = allow 2 transfers
   ): Promise<SearchResult[]> {
     // Utilisation des données locales uniquement (APIs désactivées temporairement)
     console.log('Utilisation des données locales avec estimation des prix');
@@ -91,7 +92,8 @@ export class HybridSearchService {
           selectedLabels,
           timeRangeStart,
           timeRangeEnd,
-          datetime
+          datetime,
+          maxTransfers
         )
       );
 
@@ -122,6 +124,16 @@ export class HybridSearchService {
       return finalResults;
     }
 
-    return LocalSearchService.searchDestinations(fromStation, mode, maxTime, maxBudget, selectedLabels, timeRangeStart, timeRangeEnd, datetime);
+    return LocalSearchService.searchDestinations(
+      fromStation,
+      mode,
+      maxTime,
+      maxBudget,
+      selectedLabels,
+      timeRangeStart,
+      timeRangeEnd,
+      datetime,
+      maxTransfers
+    );
   }
 }
