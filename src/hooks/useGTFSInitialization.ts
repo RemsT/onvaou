@@ -7,17 +7,26 @@ import {
   gtfsInitService,
   type InitializationProgress
 } from '../services/gtfsInitializationService';
+import { tariffService } from '../services/tariffService';
 
 interface UseGTFSInitializationReturn {
   isInitializing: boolean;
   isInitialized: boolean;
   progress: InitializationProgress;
   error: Error | null;
+  /** Indique si les données GTFS ont plus de 30 jours */
+  isGTFSStale: boolean;
+  /**
+   * Force une réinitialisation de la base de données GTFS.
+   * Si forceDownload = true, télécharge un GTFS frais depuis data.sncf.com.
+   */
+  initializeDatabase: (forceReset?: boolean, forceDownload?: boolean) => Promise<void>;
 }
 
 export const useGTFSInitialization = (): UseGTFSInitializationReturn => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isGTFSStale, setIsGTFSStale] = useState(false);
   const [progress, setProgress] = useState<InitializationProgress>({
     step: 'start',
     progress: 0,
@@ -29,12 +38,29 @@ export const useGTFSInitialization = (): UseGTFSInitializationReturn => {
     initializeDatabase();
   }, []);
 
-  const initializeDatabase = async (forceReset: boolean = false) => {
+  const initializeDatabase = async (forceReset: boolean = false, forceDownload: boolean = false) => {
     try {
       // Forcer la suppression si demandé
       if (forceReset) {
         console.log('🔄 Suppression forcée de la base de données...');
         await gtfsInitService.resetDatabase();
+      }
+
+      // Téléchargement GTFS frais si demandé explicitement
+      if (forceDownload) {
+        console.log('⬇️  Mise à jour GTFS depuis data.sncf.com...');
+        setIsInitializing(true);
+        const ok = await gtfsInitService.downloadAndUpdateGTFS((prog) => setProgress(prog));
+        if (ok) {
+          // Charger les tarifs en parallèle
+          await tariffService.loadTariffs();
+          setIsGTFSStale(false);
+          setIsInitialized(true);
+          setTimeout(() => setIsInitializing(false), 1000);
+        } else {
+          throw new Error('Échec de la mise à jour GTFS');
+        }
+        return;
       }
 
       // Vérifier si déjà initialisée
@@ -49,10 +75,18 @@ export const useGTFSInitialization = (): UseGTFSInitializationReturn => {
         });
         setIsInitialized(true);
         setIsInitializing(false);
+
+        // Vérifier la fraîcheur des données GTFS (en arrière-plan)
+        gtfsInitService.isGTFSStale().then(stale => setIsGTFSStale(stale));
+
+        // Charger les tarifs en arrière-plan (sans bloquer l'UI)
+        tariffService.loadTariffs().catch(err =>
+          console.warn('⚠️ Chargement des tarifs échoué :', err)
+        );
         return;
       }
 
-      // Initialiser avec callback de progression
+      // Première initialisation depuis les assets bundlés
       console.log('🚀 Initialisation de la base de données...');
       setIsInitializing(true);
 
@@ -61,10 +95,22 @@ export const useGTFSInitialization = (): UseGTFSInitializationReturn => {
       });
 
       if (success) {
+        // Marquer la date du premier import (depuis les assets)
+        // On ne met pas de date ici pour que isGTFSStale revienne vrai
+        // dès que les assets sont trop anciens (pas de timestamp = stale)
+
+        // Charger les tarifs en arrière-plan
+        tariffService.loadTariffs().catch(err =>
+          console.warn('⚠️ Chargement des tarifs échoué :', err)
+        );
+
+        // Vérifier fraîcheur
+        gtfsInitService.isGTFSStale().then(stale => setIsGTFSStale(stale));
+
         setIsInitialized(true);
         setTimeout(() => {
           setIsInitializing(false);
-        }, 1000); // Petit délai pour montrer "Terminé"
+        }, 1000);
       } else {
         throw new Error('Échec de l\'initialisation de la base de données');
       }
@@ -84,6 +130,8 @@ export const useGTFSInitialization = (): UseGTFSInitializationReturn => {
     isInitializing,
     isInitialized,
     progress,
-    error
+    error,
+    isGTFSStale,
+    initializeDatabase,
   };
 };

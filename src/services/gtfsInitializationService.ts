@@ -7,6 +7,14 @@ import * as SQLite from 'expo-sqlite';
 // Utiliser l'API legacy d'Expo FileSystem (compatible avec SDK 54+)
 import * as FileSystem from 'expo-file-system/legacy';
 import { Asset } from 'expo-asset';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { unzipSync, strFromU8 } from 'fflate';
+import { LocalSearchService } from './localSearchService';
+
+const GTFS_ZIP_URL =
+  'https://eu.ftp.opendatasoft.com/sncf/gtfs/export_gtfs_voyages.zip';
+const GTFS_VERSION_KEY = 'gtfs_download_date';
+const GTFS_MAX_AGE_DAYS = 180; // 6 mois
 
 interface InitializationProgress {
   step: string;
@@ -255,7 +263,7 @@ class GTFSInitializationService {
       progress: 40,
       message: 'Import des horaires (peut prendre 4-5 minutes)...'
     });
-    await this.importStopTimes(db);
+    await this.importStopTimes(db, onProgress);
 
     // Import calendar_dates
     onProgress?.({
@@ -473,7 +481,7 @@ class GTFSInitializationService {
    * Import des horaires (stop_times) - Le plus long !
    * OPTIMISÉ: Import par batch de 500 rows
    */
-  private async importStopTimes(db: SQLite.SQLiteDatabase): Promise<void> {
+  private async importStopTimes(db: SQLite.SQLiteDatabase, onProgress?: ProgressCallback): Promise<void> {
     const rows = await this.readCSVFromAssets('stop_times.txt');
     if (rows.length <= 1) return;
 
@@ -522,9 +530,15 @@ class GTFSInitializationService {
 
         processedRows += (batchEnd - batchStart);
 
-        // Log progress every 10000 rows
+        // Log & progress update
         if (processedRows % 10000 === 0 || processedRows === totalRows) {
+          const percent = Math.min(100, 40 + Math.round((processedRows / totalRows) * 30));
           console.log(`  ${processedRows}/${totalRows} horaires importés (${Math.round(processedRows / totalRows * 100)}%)...`);
+          onProgress?.({
+            step: 'import_stop_times',
+            progress: percent,
+            message: `Import des horaires (${processedRows}/${totalRows})...`
+          });
         }
       }
     });
@@ -670,6 +684,292 @@ class GTFSInitializationService {
     console.log('✓ Vues et index créés');
   }
 
+  // ─────────────────────────────────────────────
+  // Gestion de la fraîcheur des données GTFS
+  // ─────────────────────────────────────────────
+
+  /**
+   * Retourne le nombre de jours depuis le dernier téléchargement GTFS.
+   * Retourne Infinity si jamais téléchargé.
+   */
+  async getGTFSAgeDays(): Promise<number> {
+    const dateStr = await AsyncStorage.getItem(GTFS_VERSION_KEY);
+    if (!dateStr) return Infinity;
+    const lastDownload = new Date(dateStr);
+    return (Date.now() - lastDownload.getTime()) / 86_400_000;
+  }
+
+  /**
+   * Indique si les données GTFS sont périmées (> 30 jours).
+   */
+  async isGTFSStale(): Promise<boolean> {
+    const age = await this.getGTFSAgeDays();
+    return age > GTFS_MAX_AGE_DAYS;
+  }
+
+  /**
+   * Télécharge le GTFS depuis data.sncf.com, extrait le ZIP, réimporte tout.
+   * Remplace les données existantes par les nouvelles.
+   */
+  async downloadAndUpdateGTFS(onProgress?: ProgressCallback): Promise<boolean> {
+    const zipPath = `${FileSystem.documentDirectory}gtfs_download.zip`;
+    try {
+      // 1. Téléchargement
+      onProgress?.({ step: 'download', progress: 5, message: 'Téléchargement des horaires SNCF…' });
+      console.log('⬇️  Téléchargement GTFS depuis data.sncf.com…');
+
+      const downloadResult = await FileSystem.downloadAsync(GTFS_ZIP_URL, zipPath, {});
+      if (downloadResult.status !== 200) {
+        throw new Error(`Téléchargement échoué (HTTP ${downloadResult.status})`);
+      }
+      console.log('✅ GTFS téléchargé');
+
+      // 2. Lecture du ZIP en base64 puis décodage
+      onProgress?.({ step: 'extract', progress: 30, message: 'Extraction des données…' });
+      const b64 = await FileSystem.readAsStringAsync(zipPath, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Décoder base64 → Uint8Array
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+
+      // Extraire le ZIP (fflate)
+      const files = unzipSync(bytes);
+      console.log(`✅ ZIP extrait : ${Object.keys(files).join(', ')}`);
+
+      // 3. Écriture des fichiers CSV extraits sur le système de fichiers
+      onProgress?.({ step: 'extract', progress: 40, message: 'Écriture des fichiers extraits…' });
+      const gtfsDir = `${FileSystem.documentDirectory}gtfs_extracted/`;
+      const dirInfo = await FileSystem.getInfoAsync(gtfsDir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(gtfsDir, { intermediates: true });
+      }
+
+      const neededFiles = ['stops.txt', 'routes.txt', 'trips.txt', 'stop_times.txt', 'calendar_dates.txt'];
+      for (const filename of neededFiles) {
+        const fileData = files[filename];
+        if (fileData) {
+          const content = strFromU8(fileData);
+          await FileSystem.writeAsStringAsync(`${gtfsDir}${filename}`, content);
+          console.log(`✅ ${filename} écrit (${Math.round(content.length / 1024)} KB)`);
+        } else {
+          console.warn(`⚠️ ${filename} absent du ZIP`);
+        }
+      }
+
+      // 4. Réinitialisation de la base de données avec les nouveaux fichiers
+      onProgress?.({ step: 'reimport', progress: 50, message: 'Réimport des données… (quelques minutes)' });
+      await this.resetDatabase();
+
+      const db = await SQLite.openDatabaseAsync(this.dbName, { useNewConnection: true });
+      await this.createDatabaseStructure(db, onProgress);
+      await this.importGTFSDataFromDir(db, gtfsDir, onProgress);
+      await this.createViewsAndIndexes(db, onProgress);
+
+      await db.execAsync('ANALYZE;');
+      await db.execAsync('PRAGMA journal_mode = WAL;');
+      await db.execAsync('PRAGMA locking_mode = NORMAL;');
+      await db.execAsync('PRAGMA synchronous = NORMAL;');
+      await db.closeAsync();
+
+      // 5. Nettoyage + enregistrement de la date
+      await FileSystem.deleteAsync(zipPath, { idempotent: true });
+      await AsyncStorage.setItem(GTFS_VERSION_KEY, new Date().toISOString());
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      onProgress?.({ step: 'complete', progress: 100, message: 'Données mises à jour !' });
+      console.log('✅ GTFS mis à jour depuis data.sncf.com');
+      return true;
+
+    } catch (error) {
+      console.error('❌ Erreur mise à jour GTFS :', error);
+      // Nettoyer le zip en cas d'échec
+      await FileSystem.deleteAsync(zipPath, { idempotent: true }).catch(() => {});
+      onProgress?.({
+        step: 'error',
+        progress: 0,
+        message: `Erreur de mise à jour : ${error instanceof Error ? error.message : 'Erreur inconnue'}`,
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Importe les données GTFS depuis un dossier local (fichiers extraits du ZIP).
+   * Remplace importGTFSData (qui lit depuis les assets).
+   */
+  private async importGTFSDataFromDir(
+    db: SQLite.SQLiteDatabase,
+    dir: string,
+    onProgress?: ProgressCallback
+  ): Promise<void> {
+    onProgress?.({ step: 'import_stops', progress: 52, message: 'Import des gares…' });
+    await this.importFromDir(db, dir, 'stops.txt', this.importStopsFromRows.bind(this));
+
+    onProgress?.({ step: 'import_routes', progress: 58, message: 'Import des lignes…' });
+    await this.importFromDir(db, dir, 'routes.txt', this.importRoutesFromRows.bind(this));
+
+    onProgress?.({ step: 'import_trips', progress: 63, message: 'Import des trajets…' });
+    await this.importFromDir(db, dir, 'trips.txt', this.importTripsFromRows.bind(this));
+
+    onProgress?.({ step: 'import_stop_times', progress: 68, message: 'Import des horaires…' });
+    await this.importStopTimesFromDir(db, dir, onProgress);
+
+    onProgress?.({ step: 'import_calendar', progress: 88, message: 'Import du calendrier…' });
+    await this.importFromDir(db, dir, 'calendar_dates.txt', this.importCalendarFromRows.bind(this));
+  }
+
+  private async importFromDir(
+    db: SQLite.SQLiteDatabase,
+    dir: string,
+    filename: string,
+    importFn: (db: SQLite.SQLiteDatabase, rows: string[][]) => Promise<void>
+  ): Promise<void> {
+    const path = `${dir}${filename}`;
+    const info = await FileSystem.getInfoAsync(path);
+    if (!info.exists) {
+      console.warn(`⚠️ ${filename} manquant dans ${dir}`);
+      return;
+    }
+    const content = await FileSystem.readAsStringAsync(path);
+    const rows = content.split('\n').filter(l => l.trim()).map(l => l.split(',').map(v => v.trim()));
+    await importFn(db, rows);
+  }
+
+  private async importStopsFromRows(db: SQLite.SQLiteDatabase, rows: string[][]): Promise<void> {
+    if (rows.length <= 1) return;
+    const headers = rows[0];
+    const stopIdIdx = headers.indexOf('stop_id');
+    const stopNameIdx = headers.indexOf('stop_name');
+    const stopLatIdx = headers.indexOf('stop_lat');
+    const stopLonIdx = headers.indexOf('stop_lon');
+    const parentStationIdx = headers.indexOf('parent_station');
+    const locationTypeIdx = headers.indexOf('location_type');
+    const seenStopIds = new Set<string>();
+    const BATCH = 100;
+    let importedCount = 0;
+    await db.withTransactionAsync(async () => {
+      let batchVals: any[] = [];
+      let batchPH: string[] = [];
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const stopId = row[stopIdIdx];
+        const locationType = row[locationTypeIdx] || '0';
+        if ((locationType === '0' || locationType === '1' || locationType === '') && !seenStopIds.has(stopId)) {
+          batchPH.push('(?, ?, ?, ?, ?)');
+          batchVals.push(stopId, row[stopNameIdx], parseFloat(row[stopLatIdx]) || 0, parseFloat(row[stopLonIdx]) || 0, row[parentStationIdx] || null);
+          seenStopIds.add(stopId);
+          if (batchPH.length >= BATCH) {
+            await db.runAsync(`INSERT OR IGNORE INTO stops (stop_id, stop_name, stop_lat, stop_lon, parent_station) VALUES ${batchPH.join(', ')}`, batchVals);
+            importedCount += batchPH.length;
+            batchVals = []; batchPH = [];
+          }
+        }
+      }
+      if (batchPH.length > 0) {
+        await db.runAsync(`INSERT OR IGNORE INTO stops (stop_id, stop_name, stop_lat, stop_lon, parent_station) VALUES ${batchPH.join(', ')}`, batchVals);
+        importedCount += batchPH.length;
+      }
+    });
+    console.log(`✅ ${importedCount} gares importées`);
+  }
+
+  private async importRoutesFromRows(db: SQLite.SQLiteDatabase, rows: string[][]): Promise<void> {
+    if (rows.length <= 1) return;
+    const h = rows[0];
+    const idIdx = h.indexOf('route_id'), snIdx = h.indexOf('route_short_name'),
+      lnIdx = h.indexOf('route_long_name'), rtIdx = h.indexOf('route_type');
+    await db.withTransactionAsync(async () => {
+      const stmt = await db.prepareAsync('INSERT OR IGNORE INTO routes (route_id, route_short_name, route_long_name, route_type) VALUES (?, ?, ?, ?)');
+      try {
+        for (let i = 1; i < rows.length; i++) {
+          const r = rows[i];
+          await stmt.executeAsync([r[idIdx], r[snIdx] || '', r[lnIdx] || '', parseInt(r[rtIdx]) || 0]);
+        }
+      } finally { await stmt.finalizeAsync(); }
+    });
+  }
+
+  private async importTripsFromRows(db: SQLite.SQLiteDatabase, rows: string[][]): Promise<void> {
+    if (rows.length <= 1) return;
+    const h = rows[0];
+    const tIdx = h.indexOf('trip_id'), rIdx = h.indexOf('route_id'),
+      sIdx = h.indexOf('service_id'), hsIdx = h.indexOf('trip_headsign');
+    await db.withTransactionAsync(async () => {
+      const stmt = await db.prepareAsync('INSERT OR IGNORE INTO trips (trip_id, route_id, service_id, trip_headsign) VALUES (?, ?, ?, ?)');
+      try {
+        for (let i = 1; i < rows.length; i++) {
+          const r = rows[i];
+          await stmt.executeAsync([r[tIdx], r[rIdx], r[sIdx], r[hsIdx] || '']);
+        }
+      } finally { await stmt.finalizeAsync(); }
+    });
+  }
+
+  private async importCalendarFromRows(db: SQLite.SQLiteDatabase, rows: string[][]): Promise<void> {
+    if (rows.length <= 1) return;
+    const h = rows[0];
+    const sIdx = h.indexOf('service_id'), dIdx = h.indexOf('date'), eIdx = h.indexOf('exception_type');
+    await db.withTransactionAsync(async () => {
+      const stmt = await db.prepareAsync('INSERT OR IGNORE INTO calendar_dates (service_id, date, exception_type) VALUES (?, ?, ?)');
+      try {
+        for (let i = 1; i < rows.length; i++) {
+          const r = rows[i];
+          await stmt.executeAsync([r[sIdx], r[dIdx], parseInt(r[eIdx]) || 0]);
+        }
+      } finally { await stmt.finalizeAsync(); }
+    });
+  }
+
+  private async importStopTimesFromDir(
+    db: SQLite.SQLiteDatabase,
+    dir: string,
+    onProgress?: ProgressCallback
+  ): Promise<void> {
+    const path = `${dir}stop_times.txt`;
+    const info = await FileSystem.getInfoAsync(path);
+    if (!info.exists) { console.warn('⚠️ stop_times.txt manquant'); return; }
+
+    const content = await FileSystem.readAsStringAsync(path);
+    const lines = content.split('\n').filter(l => l.trim());
+    if (lines.length <= 1) return;
+
+    const headers = lines[0].split(',').map(v => v.trim());
+    const tIdx = headers.indexOf('trip_id'), sIdx = headers.indexOf('stop_id'),
+      aIdx = headers.indexOf('arrival_time'), dIdx = headers.indexOf('departure_time'),
+      seqIdx = headers.indexOf('stop_sequence');
+
+    const totalRows = lines.length - 1;
+    await db.execAsync('PRAGMA foreign_keys = OFF; PRAGMA synchronous = OFF; PRAGMA journal_mode = MEMORY; PRAGMA locking_mode = EXCLUSIVE;');
+
+    const BATCH = 500;
+    let processed = 0;
+    await db.withTransactionAsync(async () => {
+      for (let batchStart = 1; batchStart < lines.length; batchStart += BATCH) {
+        const batchEnd = Math.min(batchStart + BATCH, lines.length);
+        const values: any[] = [];
+        const ph: string[] = [];
+        for (let i = batchStart; i < batchEnd; i++) {
+          const row = lines[i].split(',').map(v => v.trim());
+          ph.push('(?, ?, ?, ?, ?)');
+          values.push(row[tIdx], row[sIdx], row[aIdx], row[dIdx], parseInt(row[seqIdx]) || 0);
+        }
+        await db.runAsync(`INSERT OR IGNORE INTO stop_times (trip_id, stop_id, arrival_time, departure_time, stop_sequence) VALUES ${ph.join(', ')}`, values);
+        processed += (batchEnd - batchStart);
+        if (processed % 10000 === 0 || processed === totalRows) {
+          const pct = Math.min(100, 68 + Math.round((processed / totalRows) * 20));
+          onProgress?.({ step: 'import_stop_times', progress: pct, message: `Import horaires (${processed}/${totalRows})…` });
+        }
+      }
+    });
+
+    await db.execAsync('PRAGMA foreign_keys = ON; PRAGMA synchronous = NORMAL; PRAGMA journal_mode = WAL; PRAGMA locking_mode = NORMAL;');
+  }
+
   /**
    * Supprime la base de données (pour forcer une réinitialisation)
    */
@@ -690,6 +990,9 @@ class GTFSInitializationService {
         console.log('🗑️  Suppression de la base de données...');
         await FileSystem.deleteAsync(this.dbPath);
         console.log('✓ Base de données supprimée');
+
+        // Effacer les caches de recherche pour éviter les résultats obsolètes
+        LocalSearchService.clearCache();
       }
     } catch (error) {
       console.error('Erreur lors de la suppression de la DB:', error);
