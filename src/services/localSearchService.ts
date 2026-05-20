@@ -143,6 +143,16 @@ export class LocalSearchService {
         }
       }
 
+      // FALLBACK FINAL: chercher directement dans stop_times par numéro
+      // couvre les cas où le format du stop_id a changé dans le nouveau GTFS
+      debugLog(`[LocalSearchService] 🔍 Fallback: recherche directe dans stop_times pour: ${sncfNumber}`);
+      const stopInTrips = await gtfsDbEnhanced.findStopInTrips(sncfNumber);
+      if (stopInTrips) {
+        debugLog(`[LocalSearchService] ✅ Stop trouvé dans stop_times: ${stopInTrips}`);
+        this.gtfsIdCache.set(sncfId, stopInTrips);
+        return stopInTrips;
+      }
+
       errorLog(`[LocalSearchService] ❌ Impossible de trouver cette gare dans GTFS`);
       return null;
     } catch (error) {

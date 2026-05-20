@@ -302,6 +302,29 @@ class GTFSDatabaseServiceEnhanced {
   }
 
   /**
+   * Cherche un stop_id utilisé dans stop_times qui contient le numéro SNCF
+   * Fallback quand le format stop_id a changé dans un nouveau fichier GTFS
+   */
+  async findStopInTrips(sncfNumber: string): Promise<string | null> {
+    if (!this.db) return null;
+    try {
+      const row = await this.db.getFirstAsync<{ stop_id: string }>(
+        `SELECT DISTINCT st.stop_id
+         FROM stop_times st
+         JOIN stops s ON st.stop_id = s.stop_id
+         WHERE st.stop_id LIKE ? OR s.stop_id LIKE ?
+         ORDER BY
+           CASE WHEN st.stop_id LIKE 'StopArea%' THEN 1 ELSE 2 END
+         LIMIT 1`,
+        [`%${sncfNumber}%`, `%${sncfNumber}%`]
+      );
+      return row?.stop_id ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Recherche des gares par nom ou par ID
    */
   async searchStops(query: string, limit: number = 20): Promise<Stop[]> {
@@ -413,8 +436,30 @@ class GTFSDatabaseServiceEnhanced {
   }
 
   /**
+   * Résout tous les stop_id utilisables dans stop_times pour une gare donnée.
+   * Un fromStopId peut être un StopArea (jamais dans stop_times) ou un StopPoint.
+   * On retourne : le StopArea lui-même + tous ses StopPoints enfants + le fromStopId tel quel.
+   * Cela permet d'utiliser un WHERE IN (...) efficace sur la vue direct_connections.
+   */
+  private async resolveStopIds(fromStopId: string): Promise<string[]> {
+    if (!this.db) return [fromStopId];
+
+    const rows = await this.db.getAllAsync<{ stop_id: string }>(
+      `SELECT stop_id FROM stops WHERE stop_id = ? OR parent_station = ?`,
+      [fromStopId, fromStopId]
+    );
+
+    const ids = rows.map(r => r.stop_id);
+    // Toujours inclure l'ID original au cas où il n'est pas dans la table stops
+    if (!ids.includes(fromStopId)) ids.push(fromStopId);
+
+    debugLog(`[resolveStopIds] ${fromStopId} → ${ids.length} stop IDs: ${ids.slice(0, 5).join(', ')}${ids.length > 5 ? '…' : ''}`);
+    return ids;
+  }
+
+  /**
    * 🚀 OPTIMISÉ: Trouve TOUTES les destinations accessibles depuis une gare en UNE SEULE requête SQL
-   * Beaucoup plus rapide que de chercher destination par destination
+   * Utilise resolveStopIds pour éviter le LEFT JOIN + OR coûteux sur la vue direct_connections.
    */
   async findAllDestinationsFrom(
     fromStopId: string,
@@ -426,30 +471,44 @@ class GTFSDatabaseServiceEnhanced {
       throw new Error('Database not initialized');
     }
 
-    // Recherche toutes les destinations accessibles depuis fromStopId (incluant les StopPoints enfants)
-    let query = `
-      SELECT DISTINCT dc.* FROM direct_connections dc
-      LEFT JOIN stops from_stops ON dc.from_stop_id = from_stops.stop_id
-      WHERE (dc.from_stop_id = ? OR from_stops.parent_station = ?)
-    `;
-    const params: any[] = [fromStopId, fromStopId];
+    const stopIds = await this.resolveStopIds(fromStopId);
+    const ph = stopIds.map(() => '?').join(',');
+
+    // ROW_NUMBER() pour garder UN seul trajet par destination (le premier départ)
+    // évite le problème de LIMIT atteint à cause des doublons (même OD, trains différents)
+    let innerWhere = `from_stop_id IN (${ph})`;
+    const params: any[] = [...stopIds];
 
     if (departureTimeMin) {
-      query += ` AND dc.departure_time >= ?`;
+      innerWhere += ` AND departure_time >= ?`;
       params.push(departureTimeMin);
     }
-
     if (departureTimeMax) {
-      query += ` AND dc.departure_time <= ?`;
+      innerWhere += ` AND departure_time <= ?`;
       params.push(departureTimeMax);
     }
 
-    query += ` ORDER BY dc.to_stop_id, dc.departure_time LIMIT ?`;
+    const query = `
+      WITH best_per_dest AS (
+        SELECT *,
+          ROW_NUMBER() OVER (PARTITION BY to_stop_id ORDER BY departure_time) as rn
+        FROM direct_connections
+        WHERE ${innerWhere}
+      )
+      SELECT trip_id, from_stop_id, from_stop_name, from_lat, from_lon,
+             departure_time, to_stop_id, to_stop_name, to_lat, to_lon,
+             arrival_time, to_departure_time, nb_stops, route_short_name,
+             route_long_name, service_id, trip_headsign
+      FROM best_per_dest
+      WHERE rn = 1
+      ORDER BY to_stop_id
+      LIMIT ?
+    `;
     params.push(limit);
 
-    debugLog(`[findAllDestinationsFrom] 🚀 Recherche BULK de toutes les destinations depuis ${fromStopId}`);
+    debugLog(`[findAllDestinationsFrom] 🚀 Recherche BULK (1 trajet/destination) depuis ${stopIds.length} stop IDs (${fromStopId})`);
     const result = await this.db.getAllAsync<Connection>(query, params);
-    debugLog(`[findAllDestinationsFrom] ✅ ${result.length} connexions trouvées`);
+    debugLog(`[findAllDestinationsFrom] ✅ ${result.length} destinations uniques trouvées`);
 
     return result;
   }
@@ -472,55 +531,64 @@ class GTFSDatabaseServiceEnhanced {
 
     debugLog(`[findAllDestinationsWithOneTransfer] 🔄 Recherche BULK avec 1 correspondance depuis ${fromStopId}`);
 
+    const stopIds = await this.resolveStopIds(fromStopId);
+    const ph = stopIds.map(() => '?').join(',');
+
+    // ROW_NUMBER() pour garder le MEILLEUR trajet par destination (durée minimale)
     const query = `
-      SELECT
-        -- Informations du trajet
-        leg2.to_stop_id as destination_id,
-        leg2.to_stop_name as destination_name,
+      WITH raw_transfers AS (
+        SELECT
+          leg2.to_stop_id as destination_id,
+          leg2.to_stop_name as destination_name,
+          leg1.departure_time,
+          leg1.arrival_time as transfer_arrival,
+          leg1.route_short_name as route1,
+          leg1.to_stop_name as transfer_station,
+          leg1.to_lat as transfer_lat,
+          leg1.to_lon as transfer_lon,
+          leg2.departure_time as transfer_departure,
+          leg2.arrival_time,
+          leg2.route_short_name as route2,
 
-        -- Premier segment
-        leg1.departure_time,
-        leg1.arrival_time as transfer_arrival,
-        leg1.route_short_name as route1,
-        leg1.to_stop_name as transfer_station,
-        leg1.to_lat as transfer_lat,
-        leg1.to_lon as transfer_lon,
+          (CAST(substr(leg2.departure_time, 1, 2) AS INTEGER) * 60 +
+           CAST(substr(leg2.departure_time, 4, 2) AS INTEGER)) -
+          (CAST(substr(leg1.arrival_time, 1, 2) AS INTEGER) * 60 +
+           CAST(substr(leg1.arrival_time, 4, 2) AS INTEGER)) as transfer_wait_minutes,
 
-        -- Deuxième segment
-        leg2.departure_time as transfer_departure,
-        leg2.arrival_time,
-        leg2.route_short_name as route2,
+          (CAST(substr(leg2.arrival_time, 1, 2) AS INTEGER) * 60 +
+           CAST(substr(leg2.arrival_time, 4, 2) AS INTEGER)) -
+          (CAST(substr(leg1.departure_time, 1, 2) AS INTEGER) * 60 +
+           CAST(substr(leg1.departure_time, 4, 2) AS INTEGER)) as total_duration_minutes
 
-        -- Calculs
-        (CAST(substr(leg2.departure_time, 1, 2) AS INTEGER) * 60 +
-         CAST(substr(leg2.departure_time, 4, 2) AS INTEGER)) -
-        (CAST(substr(leg1.arrival_time, 1, 2) AS INTEGER) * 60 +
-         CAST(substr(leg1.arrival_time, 4, 2) AS INTEGER)) as transfer_wait_minutes,
+        FROM direct_connections leg1
+        JOIN direct_connections leg2
+          ON leg1.to_stop_id = leg2.from_stop_id
+          AND leg1.trip_id != leg2.trip_id
+          AND leg2.departure_time > leg1.arrival_time
 
-        (CAST(substr(leg2.arrival_time, 1, 2) AS INTEGER) * 60 +
-         CAST(substr(leg2.arrival_time, 4, 2) AS INTEGER)) -
-        (CAST(substr(leg1.departure_time, 1, 2) AS INTEGER) * 60 +
-         CAST(substr(leg1.departure_time, 4, 2) AS INTEGER)) as total_duration_minutes
-
-      FROM direct_connections leg1
-      LEFT JOIN stops from_stops ON leg1.from_stop_id = from_stops.stop_id
-      JOIN direct_connections leg2
-        ON leg1.to_stop_id = leg2.from_stop_id
-        AND leg1.trip_id != leg2.trip_id
-        AND leg2.departure_time > leg1.arrival_time
-
-      WHERE (leg1.from_stop_id = ? OR from_stops.parent_station = ?)
-        ${departureTimeMin ? 'AND leg1.departure_time >= ?' : ''}
-        ${departureTimeMax ? 'AND leg1.departure_time <= ?' : ''}
-        AND transfer_wait_minutes >= 5
-        AND transfer_wait_minutes <= ?
-        ${maxTotalDuration ? 'AND total_duration_minutes <= ?' : ''}
-
-      ORDER BY leg2.to_stop_id, total_duration_minutes
+        WHERE leg1.from_stop_id IN (${ph})
+          ${departureTimeMin ? 'AND leg1.departure_time >= ?' : ''}
+          ${departureTimeMax ? 'AND leg1.departure_time <= ?' : ''}
+      ),
+      filtered AS (
+        SELECT *,
+          ROW_NUMBER() OVER (PARTITION BY destination_id ORDER BY total_duration_minutes) as rn
+        FROM raw_transfers
+        WHERE transfer_wait_minutes >= 5
+          AND transfer_wait_minutes <= ?
+          ${maxTotalDuration ? 'AND total_duration_minutes <= ?' : ''}
+      )
+      SELECT destination_id, destination_name, departure_time, transfer_arrival,
+             route1, transfer_station, transfer_lat, transfer_lon,
+             transfer_departure, arrival_time, route2,
+             transfer_wait_minutes, total_duration_minutes
+      FROM filtered
+      WHERE rn = 1
+      ORDER BY destination_id
       LIMIT ?;
     `;
 
-    const params: any[] = [fromStopId, fromStopId];
+    const params: any[] = [...stopIds];
     if (departureTimeMin) params.push(departureTimeMin);
     if (departureTimeMax) params.push(departureTimeMax);
     params.push(maxWaitMinutes);
