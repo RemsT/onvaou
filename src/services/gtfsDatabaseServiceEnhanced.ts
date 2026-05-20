@@ -69,7 +69,7 @@ export interface CalendarService {
   end_date: string;
 }
 
-class GTFSDatabaseServiceEnhanced {
+export class GTFSDatabaseServiceEnhanced {
   private db: SQLite.SQLiteDatabase | null = null;
   private initialized = false;
   private initializationPromise: Promise<void> | null = null;

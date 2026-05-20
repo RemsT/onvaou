@@ -6,7 +6,27 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "transformIgnorePatterns": [
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/(?!vector-icons)|@expo-google-fonts|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)"
+    ],
+    "moduleNameMapper": {
+      "^expo-sqlite$": "<rootDir>/__mocks__/expo-sqlite.ts",
+      "^expo-file-system/legacy$": "<rootDir>/__mocks__/expo-file-system-legacy.ts",
+      "^expo-file-system$": "<rootDir>/__mocks__/expo-file-system-legacy.ts",
+      "^@react-native-async-storage/async-storage$": "<rootDir>/__mocks__/async-storage.ts"
+    },
+    "testMatch": ["**/__tests__/**/*.test.ts", "**/__tests__/**/*.test.tsx"],
+    "collectCoverageFrom": [
+      "src/services/**/*.ts",
+      "!src/services/locationService.ts"
+    ]
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -36,10 +56,12 @@
   },
   "private": true,
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.1.10",
     "babel-preset-expo": "^54.0.4",
     "better-sqlite3": "^12.4.1",
     "dotenv": "^16.6.1",
+    "jest-expo": "^55.0.18",
     "typescript": "~5.9.2"
   }
 }
