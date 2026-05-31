@@ -502,14 +502,42 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Centres d'intérêt */}
-          <Text style={styles.filterSectionLabel}>Centres d'intérêt</Text>
-          <LabelSelectionField
-            selectedLabels={selectedLabels}
-            onPress={() => setShowLabelModal(true)}
-          />
-
         </View>
+
+        {/* Centres d'intérêt Card */}
+        <TouchableOpacity
+          style={[
+            styles.card,
+            styles.labelsCard,
+            selectedLabels.length > 0 && styles.labelsCardActive,
+            loading && styles.filterRowDisabled,
+          ]}
+          onPress={() => setShowLabelModal(true)}
+          activeOpacity={0.8}
+          disabled={loading}
+        >
+          <View style={styles.labelsCardHeader}>
+            <Text style={[styles.cardTitle, { marginBottom: 0 }]}>Centres d'intérêt</Text>
+            <Text style={styles.labelsCardOptional}>optionnel</Text>
+          </View>
+          {selectedLabels.length === 0 ? (
+            <Text style={styles.labelsCardPlaceholder}>
+              Filtrer par activité : montagne, plage, randonnée...
+            </Text>
+          ) : (
+            <View style={styles.labelsChipsRow}>
+              {selectedLabels.map(label => (
+                <View
+                  key={label}
+                  style={[styles.labelsChip, { borderColor: '#4CAF50', backgroundColor: '#E8F5E9' }]}
+                >
+                  <Text style={styles.labelsChipText}>{label.replace(/-/g, ' ')}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          <Text style={styles.labelsCardArrow}>Modifier ›</Text>
+        </TouchableOpacity>
 
         {/* Search Button */}
         <TouchableOpacity
@@ -839,6 +867,51 @@ const styles = StyleSheet.create({
     color: '#5F6368',
     marginTop: 12,
     marginBottom: 6,
+  },
+  labelsCard: {
+    gap: 8,
+  },
+  labelsCardActive: {
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
+  labelsCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  labelsCardOptional: {
+    fontSize: 11,
+    color: '#9E9E9E',
+    fontStyle: 'italic',
+  },
+  labelsCardPlaceholder: {
+    fontSize: 13,
+    color: '#9E9E9E',
+  },
+  labelsChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  labelsChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  labelsChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2E7D32',
+    textTransform: 'capitalize',
+  },
+  labelsCardArrow: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '600',
+    textAlign: 'right',
   },
   filterSubLabel: {
     fontSize: 12,
