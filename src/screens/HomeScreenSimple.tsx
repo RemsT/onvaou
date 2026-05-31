@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import { useGTFSInitialization } from '../hooks/useGTFSInitialization';
 import { DatabaseInitializationScreen } from '../components/DatabaseInitializationScreen';
 import { Station, CityLabel } from '../types';
 import { Ionicons } from '@expo/vector-icons';
+import { recentSearchService, RecentSearch } from '../services/recentSearchService';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -51,9 +52,16 @@ export default function HomeScreen() {
   const [includeTransfers, setIncludeTransfers] = useState(false);
   const stationInputRef = useRef<any>(null);
 
+  // Recherche récente
+  const [recentSearch, setRecentSearch] = useState<RecentSearch | null>(null);
+
   // Initialisation de la base de données GTFS
   const { isInitializing, progress: initProgress, initializeDatabase, isGTFSStale } = useGTFSInitialization();
   const [isUpdating, setIsUpdating] = useState(false);
+
+  useEffect(() => {
+    recentSearchService.get().then(setRecentSearch);
+  }, []);
 
   const handleStationSearch = async (text: string) => {
     setStationSearch(text);
@@ -70,6 +78,19 @@ export default function HomeScreen() {
     setFromStation(station);
     setStationSearch('');
     setStationSuggestions([]);
+  };
+
+  const handleRelaunch = async (recent: RecentSearch) => {
+    setFromStation(recent.fromStation);
+    setEnableTimeFilter(recent.enableTimeFilter);
+    setEnableBudgetFilter(recent.enableBudgetFilter);
+    setMaxTime(recent.maxTime);
+    setMaxBudget(recent.maxBudget);
+    setSelectedDate(recent.selectedDate ? new Date(recent.selectedDate) : null);
+    setSelectedLabels(recent.selectedLabels);
+    setTimeRangeStart(recent.timeRangeStart);
+    setTimeRangeEnd(recent.timeRangeEnd);
+    setIncludeTransfers(recent.includeTransfers);
   };
 
   const handleLabelModalClose = (labels: CityLabel[]) => {
@@ -165,6 +186,19 @@ export default function HomeScreen() {
         // Si non coché: afficher uniquement les trajets directs
         if (includeTransfers) return true;
         return transfers === 0;
+      });
+
+      recentSearchService.save({
+        fromStation,
+        enableTimeFilter,
+        enableBudgetFilter,
+        maxTime,
+        maxBudget,
+        selectedDate: selectedDate ? selectedDate.getTime() : null,
+        selectedLabels,
+        timeRangeStart,
+        timeRangeEnd,
+        includeTransfers,
       });
 
       navigation.navigate('MapView', {
@@ -267,6 +301,27 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.content}>
+        {/* Bannière dernière recherche */}
+        {recentSearch && !loading && (
+          <TouchableOpacity
+            style={styles.recentSearchBanner}
+            onPress={() => handleRelaunch(recentSearch)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="time-outline" size={18} color="#4CAF50" />
+            <View style={styles.recentSearchContent}>
+              <Text style={styles.recentSearchTitle}>Dernière recherche</Text>
+              <Text style={styles.recentSearchSummary} numberOfLines={1}>
+                {recentSearch.fromStation.name}
+                {recentSearch.enableTimeFilter ? ` · ${recentSearch.maxTime.replace(':', 'h')} max` : ''}
+                {recentSearch.enableBudgetFilter ? ` · ${recentSearch.maxBudget}€ max` : ''}
+                {recentSearch.selectedDate ? ` · ${new Date(recentSearch.selectedDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}
+              </Text>
+            </View>
+            <Text style={styles.recentSearchAction}>Relancer →</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Station Card */}
         <View style={[styles.card, loading && styles.filterRowDisabled]}>
           <Text style={styles.cardTitle}>Gare de départ</Text>
@@ -586,6 +641,42 @@ const styles = StyleSheet.create({
 
   content: {
     padding: 16,
+  },
+
+  // Bannière dernière recherche
+  recentSearchBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: '#C8E6C9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  recentSearchContent: {
+    flex: 1,
+  },
+  recentSearchTitle: {
+    fontSize: 12,
+    color: '#5F6368',
+    marginBottom: 2,
+  },
+  recentSearchSummary: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0C3823',
+  },
+  recentSearchAction: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#4CAF50',
   },
 
   // Card Style
