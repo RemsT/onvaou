@@ -1,5 +1,6 @@
 import { CityLabel, StationData, TagEvidence, UI_LABELS } from '../types';
 import { allStations } from './allStations';
+import { generatedLabels } from './stationLabelsGenerated';
 
 const UI_LABELS_SET = new Set<CityLabel>(UI_LABELS);
 
@@ -17,7 +18,8 @@ function tag(label: CityLabel, reason: string, source: string, linkLabel: string
   return { label, reason, source, linkLabel, confidence };
 }
 
-export const stationLabels: Record<string, StationData> = {
+// Tags curés à la main (haute qualité, avec descriptions Wikipedia + sources officielles).
+const manualLabels: Record<string, StationData> = {
 
   // ─── Paris & Île-de-France ────────────────────────────────────────────────
   "87271007": { // Paris Gare du Nord
@@ -685,6 +687,17 @@ export const stationLabels: Record<string, StationData> = {
       tag('culture-histoire', 'Musée Nicéphore Niépce (invention de la photographie)', W + 'Nicéphore_Niépce', 'Voir le Musée Niépce', 85),
     ],
   },
+};
+
+/**
+ * Tags de toutes les gares.
+ * Fusion : données générées depuis DATAtourisme (base nationale officielle,
+ * data.gouv.fr) + curation manuelle prioritaire (descriptions + sources vérifiées).
+ * Pour une gare présente dans les deux, la curation manuelle l'emporte.
+ */
+export const stationLabels: Record<string, StationData> = {
+  ...generatedLabels,
+  ...manualLabels,
 };
 
 // ─── Résolution d'identifiant (robuste aux évolutions de la base) ───────────

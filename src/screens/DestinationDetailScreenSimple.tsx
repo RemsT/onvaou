@@ -268,6 +268,9 @@ export default function DestinationDetailScreen() {
                     );
                   })}
                 </View>
+                <Text style={styles.tagsAttribution}>
+                  Tags générés à partir de DATAtourisme (data.gouv.fr) et de sources officielles
+                </Text>
               </View>
             )}
           </View>
@@ -551,6 +554,12 @@ const styles = StyleSheet.create({
   // Tags / activités
   tagsSection: {
     marginTop: 4,
+  },
+  tagsAttribution: {
+    fontSize: 10,
+    color: '#9E9E9E',
+    fontStyle: 'italic',
+    marginTop: 10,
   },
   tagsSectionTitle: {
     fontSize: 15,
