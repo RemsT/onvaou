@@ -321,7 +321,8 @@ export class LocalSearchService {
     timeRangeStart?: string,
     timeRangeEnd?: string,
     searchDate?: Date,
-    maxTransfers: number = 1 // 0 = direct only, 1 = at most 1 transfer, 2 = allow 2 transfers
+    maxTransfers: number = 1,
+    labelFilterMode: 'OR' | 'AND' = 'OR'
   ): Promise<SearchResult[]> {
     debugLog('========================================');
     debugLog('[LocalSearchService] 🔍 RECHERCHE DÉMARRÉE');
@@ -368,7 +369,8 @@ export class LocalSearchService {
         timeRangeStart,
         timeRangeEnd,
         searchDate,
-        maxTransfers
+        maxTransfers,
+        labelFilterMode
       );
 
       // Mettre en cache les résultats pour les mêmes paramètres
@@ -404,7 +406,8 @@ export class LocalSearchService {
     timeRangeStart?: string,
     timeRangeEnd?: string,
     searchDate?: Date,
-    maxTransfers: number = 1
+    maxTransfers: number = 1,
+    labelFilterMode: 'OR' | 'AND' = 'OR'
   ): Promise<SearchResult[]> {
     debugLog('[LocalSearchService] 🚂 Recherche avec horaires GTFS réels');
     debugLog(`[LocalSearchService] 📅 Filtres: maxTime=${maxTime}min, maxBudget=${maxBudget}€`);
@@ -880,7 +883,8 @@ export class LocalSearchService {
       if (selectedLabels && selectedLabels.length > 0) {
         const filteredIds = filterStationsByLabels(
           results.map(r => r.to_station_id),
-          selectedLabels
+          selectedLabels,
+          labelFilterMode
         );
         results = results.filter(r => filteredIds.includes(r.to_station_id));
 

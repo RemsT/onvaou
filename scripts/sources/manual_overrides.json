@@ -1,0 +1,9 @@
+{
+  "_comment": "Corrections manuelles des tags. Format: { stationId: { add: [...TagEvidence], remove: ['label1'] } }",
+  "_example": {
+    "999": {
+      "add": [{ "label": "randonnee", "reason": "GR5 passe par la ville", "source": "https://www.ffrandonnee.fr/", "linkLabel": "Voir le GR5", "confidence": 100 }],
+      "remove": ["gastronomie"]
+    }
+  }
+}

@@ -1,0 +1,17 @@
+[
+  { "name": "Disneyland Paris", "lat": 48.8722, "lon": 2.7760, "url": "https://fr.wikipedia.org/wiki/Disneyland_Paris" },
+  { "name": "Puy du Fou", "lat": 46.9214, "lon": -0.9931, "url": "https://fr.wikipedia.org/wiki/Puy_du_Fou" },
+  { "name": "Parc Astérix", "lat": 49.1347, "lon": 2.5733, "url": "https://fr.wikipedia.org/wiki/Parc_Astérix" },
+  { "name": "Futuroscope", "lat": 46.6681, "lon": 0.3661, "url": "https://fr.wikipedia.org/wiki/Futuroscope" },
+  { "name": "Europa-Park", "lat": 48.2683, "lon": 7.7222, "url": "https://fr.wikipedia.org/wiki/Europa-Park" },
+  { "name": "Marineland", "lat": 43.6208, "lon": 7.1058, "url": "https://fr.wikipedia.org/wiki/Marineland_(Antibes)" },
+  { "name": "Zoo de La Flèche", "lat": 47.6931, "lon": -0.0767, "url": "https://fr.wikipedia.org/wiki/Zoo_de_La_Flèche" },
+  { "name": "Planète Sauvage", "lat": 47.1728, "lon": -1.9306, "url": "https://fr.wikipedia.org/wiki/Planète_Sauvage" },
+  { "name": "Nigloland", "lat": 48.3667, "lon": 4.6000, "url": "https://fr.wikipedia.org/wiki/Nigloland" },
+  { "name": "Parc de Préhistoire de Bretagne", "lat": 47.8333, "lon": -2.5833, "url": "https://fr.wikipedia.org/wiki/Malansac" },
+  { "name": "Walibi Rhône-Alpes", "lat": 45.6133, "lon": 5.5761, "url": "https://fr.wikipedia.org/wiki/Walibi_Rhône-Alpes" },
+  { "name": "Spirou Provence", "lat": 43.8617, "lon": 4.3617, "url": "https://fr.wikipedia.org/wiki/Spirou_Provence" },
+  { "name": "OK Corral", "lat": 43.3597, "lon": 5.6639, "url": "https://fr.wikipedia.org/wiki/OK_Corral" },
+  { "name": "Mer de Sable", "lat": 49.1522, "lon": 2.7394, "url": "https://fr.wikipedia.org/wiki/Mer_de_Sable" },
+  { "name": "Aquaboulevard", "lat": 48.8344, "lon": 2.2775, "url": "https://fr.wikipedia.org/wiki/Aquaboulevard" }
+]

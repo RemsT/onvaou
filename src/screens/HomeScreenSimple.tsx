@@ -43,6 +43,7 @@ export default function HomeScreen() {
   const [stationSuggestions, setStationSuggestions] = useState<Station[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedLabels, setSelectedLabels] = useState<CityLabel[]>([]);
+  const [labelFilterMode, setLabelFilterMode] = useState<'OR' | 'AND'>('OR');
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
   const [showBudgetPickerModal, setShowBudgetPickerModal] = useState(false);
@@ -88,13 +89,15 @@ export default function HomeScreen() {
     setMaxBudget(recent.maxBudget);
     setSelectedDate(recent.selectedDate ? new Date(recent.selectedDate) : null);
     setSelectedLabels(recent.selectedLabels);
+    setLabelFilterMode(recent.labelFilterMode ?? 'OR');
     setTimeRangeStart(recent.timeRangeStart);
     setTimeRangeEnd(recent.timeRangeEnd);
     setIncludeTransfers(recent.includeTransfers);
   };
 
-  const handleLabelModalClose = (labels: CityLabel[]) => {
+  const handleLabelModalClose = (labels: CityLabel[], mode: 'OR' | 'AND') => {
     setSelectedLabels(labels);
+    setLabelFilterMode(mode);
     setShowLabelModal(false);
   };
 
@@ -175,7 +178,8 @@ export default function HomeScreen() {
         selectedLabels.length > 0 ? selectedLabels : undefined,
         timeRangeStart,
         timeRangeEnd,
-        maxTransfers
+        maxTransfers,
+        labelFilterMode
       );
 
       // Filtrer les résultats selon les checkboxes de correspondances
@@ -196,6 +200,7 @@ export default function HomeScreen() {
         maxBudget,
         selectedDate: selectedDate ? selectedDate.getTime() : null,
         selectedLabels,
+        labelFilterMode,
         timeRangeStart,
         timeRangeEnd,
         includeTransfers,
@@ -497,6 +502,13 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Centres d'intérêt */}
+          <Text style={styles.filterSectionLabel}>Centres d'intérêt</Text>
+          <LabelSelectionField
+            selectedLabels={selectedLabels}
+            onPress={() => setShowLabelModal(true)}
+          />
+
         </View>
 
         {/* Search Button */}
@@ -582,6 +594,7 @@ export default function HomeScreen() {
       <LabelSelectionModal
         visible={showLabelModal}
         selectedLabels={selectedLabels}
+        labelFilterMode={labelFilterMode}
         onClose={handleLabelModalClose}
       />
 
@@ -819,6 +832,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#0C3823',
+  },
+  filterSectionLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#5F6368',
+    marginTop: 12,
+    marginBottom: 6,
   },
   filterSubLabel: {
     fontSize: 12,

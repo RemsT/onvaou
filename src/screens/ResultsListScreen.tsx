@@ -10,9 +10,10 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigatorSimple';
-import { SearchResult } from '../types';
+import { SearchResult, CITY_LABELS } from '../types';
 import StationLabels from '../components/StationLabels';
 import { PriceEstimationService } from '../services/priceEstimationService';
+import { getStationTags } from '../data/stationLabels';
 
 type ResultsListRouteProp = RouteProp<RootStackParamList, 'ResultsList'>;
 type ResultsListNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -65,51 +66,61 @@ export default function ResultsListScreen() {
     });
   };
 
-  const renderDestinationItem = ({ item }: { item: SearchResult }) => (
-    <TouchableOpacity
-      style={styles.destinationCard}
-      onPress={() => handleDestinationPress(item)}
-    >
-      <View style={styles.destinationHeader}>
-        <Text style={styles.destinationName}>{item.to_station.name}</Text>
-        <Text style={styles.arrow}>›</Text>
-      </View>
-      <View style={styles.destinationDetails}>
-        <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Durée:</Text>
-          <Text style={styles.detailText}>
-            {Math.floor(item.duration / 60)}h
-            {item.duration % 60 > 0 ? ` ${item.duration % 60}min` : ''}
-          </Text>
+  const renderDestinationItem = ({ item }: { item: SearchResult }) => {
+    const numId = typeof item.to_station_id === 'number' ? item.to_station_id : parseInt(String(item.to_station_id));
+    const topTag = getStationTags(numId)[0];
+    const topTagInfo = topTag ? CITY_LABELS[topTag.label] : null;
+
+    return (
+      <TouchableOpacity
+        style={styles.destinationCard}
+        onPress={() => handleDestinationPress(item)}
+      >
+        <View style={styles.destinationHeader}>
+          <Text style={styles.destinationName}>{item.to_station.name}</Text>
+          <Text style={styles.arrow}>›</Text>
         </View>
-        <View style={styles.detailItem}>
-          <Text style={styles.detailLabelSmall}>Départ:</Text>
-          <Text style={styles.detailTextSmall}>
-            {new Date(item.departure_time).toLocaleTimeString('fr-FR', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </Text>
-        </View>
-        {item.priceRange && (
+        <View style={styles.destinationDetails}>
           <View style={styles.detailItem}>
-            <Text style={styles.detailLabel}>Prix:</Text>
+            <Text style={styles.detailLabel}>Durée:</Text>
             <Text style={styles.detailText}>
-              {item.priceRange.min}€ - {item.priceRange.max}€
+              {Math.floor(item.duration / 60)}h
+              {item.duration % 60 > 0 ? ` ${item.duration % 60}min` : ''}
             </Text>
           </View>
-        )}
-        {item.transfers !== undefined && item.transfers > 0 && (
-          <View style={styles.transferBadge}>
-            <Text style={styles.transferBadgeText}>
-              {item.transfers} correspondance{item.transfers > 1 ? 's' : ''}
+          <View style={styles.detailItem}>
+            <Text style={styles.detailLabelSmall}>Départ:</Text>
+            <Text style={styles.detailTextSmall}>
+              {new Date(item.departure_time).toLocaleTimeString('fr-FR', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
             </Text>
           </View>
-        )}
-      </View>
-      <StationLabels stationId={item.to_station_id} maxDisplay={3} compact />
-    </TouchableOpacity>
-  );
+          {item.priceRange && (
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Prix:</Text>
+              <Text style={styles.detailText}>
+                {item.priceRange.min}€ - {item.priceRange.max}€
+              </Text>
+            </View>
+          )}
+          {item.transfers !== undefined && item.transfers > 0 && (
+            <View style={styles.transferBadge}>
+              <Text style={styles.transferBadgeText}>
+                {item.transfers} correspondance{item.transfers > 1 ? 's' : ''}
+              </Text>
+            </View>
+          )}
+        </View>
+        {topTag && topTagInfo ? (
+          <Text style={[styles.topTagText, { color: topTagInfo.color }]}>
+            {topTagInfo.icon} {topTag.reason}
+          </Text>
+        ) : null}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -427,5 +438,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#F57C00',
+  },
+  topTagText: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 6,
+    opacity: 0.85,
   },
 });

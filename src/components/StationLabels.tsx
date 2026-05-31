@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable, Linking } from 'react-native';
 import { CITY_LABELS, CityLabel } from '../types';
-import { getStationLabels } from '../data/stationLabels';
+import { getStationData, getStationTags } from '../data/stationLabels';
 
 interface StationLabelsProps {
   stationId: number | string;
@@ -12,43 +12,67 @@ interface StationLabelsProps {
 export default function StationLabels({
   stationId,
   maxDisplay = 3,
-  compact = false
+  compact = false,
 }: StationLabelsProps) {
-  const numericId = typeof stationId === 'number' ? stationId : parseInt(stationId);
-  const labels = getStationLabels(numericId);
+  const [expandedLabel, setExpandedLabel] = useState<CityLabel | null>(null);
 
-  if (labels.length === 0) {
-    return null;
-  }
+  const numericId = typeof stationId === 'number' ? stationId : parseInt(String(stationId));
+  const tags = getStationTags(numericId);
 
-  const displayLabels = labels.slice(0, maxDisplay);
-  const remainingCount = labels.length - maxDisplay;
+  if (tags.length === 0) return null;
+
+  const displayTags = tags.slice(0, maxDisplay);
+  const remainingCount = tags.length - maxDisplay;
+  const expandedTag = expandedLabel ? tags.find(t => t.label === expandedLabel) : null;
+
+  const handleBadgePress = (label: CityLabel) => {
+    if (compact) return;
+    setExpandedLabel(prev => prev === label ? null : label);
+  };
 
   return (
-    <View style={styles.container}>
-      {displayLabels.map((label) => {
-        const labelInfo = CITY_LABELS[label];
-        return (
-          <View
-            key={label}
-            style={[
-              styles.labelBadge,
-              compact && styles.labelBadgeCompact,
-              { backgroundColor: labelInfo.color + '20', borderColor: labelInfo.color }
-            ]}
-          >
-            {!compact && <Text style={styles.labelIcon}>{labelInfo.icon}</Text>}
-            {!compact && (
-              <Text style={[styles.labelText, { color: labelInfo.color }]}>
-                {labelInfo.name}
-              </Text>
-            )}
+    <View>
+      <View style={styles.container}>
+        {displayTags.map((tag) => {
+          const info = CITY_LABELS[tag.label];
+          if (!info) return null;
+          return (
+            <TouchableOpacity
+              key={tag.label}
+              onPress={() => handleBadgePress(tag.label)}
+              activeOpacity={compact ? 1 : 0.7}
+              style={[
+                styles.labelBadge,
+                compact && styles.labelBadgeCompact,
+                { backgroundColor: info.color + '20', borderColor: info.color },
+                expandedLabel === tag.label && styles.labelBadgeExpanded,
+              ]}
+            >
+              {!compact && <Text style={styles.labelIcon}>{info.icon}</Text>}
+              {!compact && (
+                <Text style={[styles.labelText, { color: info.color }]}>{info.name}</Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+        {remainingCount > 0 && (
+          <View style={[styles.labelBadge, styles.moreBadge]}>
+            <Text style={styles.moreText}>+{remainingCount}</Text>
           </View>
-        );
-      })}
-      {remainingCount > 0 && (
-        <View style={[styles.labelBadge, styles.moreBadge]}>
-          <Text style={styles.moreText}>+{remainingCount}</Text>
+        )}
+      </View>
+
+      {/* Expandable evidence panel */}
+      {expandedTag && (
+        <View style={[styles.evidencePanel, { borderLeftColor: CITY_LABELS[expandedTag.label]?.color }]}>
+          <Text style={styles.evidenceReason}>{expandedTag.reason}</Text>
+          {expandedTag.source ? (
+            <TouchableOpacity onPress={() => Linking.openURL(expandedTag.source).catch(() => {})}>
+              <Text style={[styles.evidenceLink, { color: CITY_LABELS[expandedTag.label]?.color }]}>
+                {expandedTag.linkLabel || 'En savoir plus'} →
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       )}
     </View>
@@ -73,6 +97,12 @@ const styles = StyleSheet.create({
   labelBadgeCompact: {
     paddingHorizontal: 6,
     paddingVertical: 3,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  labelBadgeExpanded: {
+    opacity: 0.8,
   },
   labelIcon: {
     fontSize: 12,
@@ -82,9 +112,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  labelTextCompact: {
-    fontSize: 10,
-  },
   moreBadge: {
     backgroundColor: '#F7F9FC',
     borderColor: '#B0BEC5',
@@ -93,5 +120,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#5F6368',
+  },
+  evidencePanel: {
+    marginTop: 8,
+    padding: 10,
+    backgroundColor: '#F7F9FC',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+  },
+  evidenceReason: {
+    fontSize: 12,
+    color: '#333',
+    lineHeight: 18,
+    marginBottom: 4,
+  },
+  evidenceLink: {
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

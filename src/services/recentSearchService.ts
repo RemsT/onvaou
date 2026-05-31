@@ -11,6 +11,7 @@ export interface RecentSearch {
   maxBudget: string;
   selectedDate: number | null; // timestamp ms
   selectedLabels: CityLabel[];
+  labelFilterMode: 'OR' | 'AND';
   timeRangeStart: string;
   timeRangeEnd: string;
   includeTransfers: boolean;

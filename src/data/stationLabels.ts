@@ -1,3783 +1,849 @@
-import { CityLabel } from '../types';
+import { CityLabel, StationData, TagEvidence } from '../types';
 
 /**
- * Labels associés à chaque gare française
- * Base de données complète avec 1200 gares labellisées selon 14 catégories
+ * Tags des gares françaises avec descriptions et sources vérifiables.
+ * Les 92 grandes destinations touristiques sont taguées manuellement avec haute qualité.
+ * Les ~1100 gares restantes sont traitées par scripts/generate-station-labels.js
+ * qui interroge Wikipedia, SANDRE, GeoNames, Base Mérimée.
  *
- * Catégories:
- * - kid-friendly: Attractions familiales, parcs, zoos
- * - sports-nautiques: Voile, surf, plongée, sports aquatiques
- * - randonnee: Sentiers de randonnée, nature
- * - culture-histoire: Monuments, musées, patrimoine
- * - gastronomie: Cuisine locale, restaurants étoilés, marchés
- * - plage-mer: Bord de mer, plages
- * - montagne: Stations de montagne, ski d'été
- * - oenologie: Vignobles, caves, routes des vins
- * - sports-hiver: Ski, snowboard, stations de sports d'hiver
- * - ville-thermale: Stations thermales, bien-être
- * - art-architecture: Architecture remarquable, galeries d'art
- * - nature-ecotourisme: Parcs naturels, écotourisme
- * - vie-nocturne: Bars, clubs, vie nocturne animée
- * - shopping: Centres commerciaux, boutiques, shopping
- *
- * Générée automatiquement le 2025-10-15
+ * Pour corriger un tag : scripts/sources/manual_overrides.json
+ * Pour regénérer : node scripts/generate-station-labels.js
+ * Dernière mise à jour manuelle : 2026-05-31
  */
-export const stationLabels: Record<number, CityLabel[]> = {
-  "1": [
-    "culture-histoire"
-  ],
-  "2": [
-    "culture-histoire"
-  ],
-  "3": [
-    "culture-histoire"
-  ],
-  "4": [
-    "plage-mer",
-    "sports-nautiques"
-  ],
-  "5": [
-    "culture-histoire"
-  ],
-  "6": [
-    "culture-histoire"
-  ],
-  "7": [
-    "culture-histoire"
-  ],
-  "8": [
-    "culture-histoire"
-  ],
-  "9": [
-    "culture-histoire"
-  ],
-  "10": [
-    "culture-histoire"
-  ],
-  "11": [
-    "culture-histoire"
-  ],
-  "12": [
-    "culture-histoire"
-  ],
-  "13": [
-    "culture-histoire"
-  ],
-  "14": [
-    "culture-histoire"
-  ],
-  "15": [
-    "culture-histoire"
-  ],
-  "16": [
-    "culture-histoire",
-    "shopping",
-    "gastronomie",
-    "vie-nocturne",
-    "art-architecture"
-  ],
-  "17": [
-    "culture-histoire"
-  ],
-  "18": [
-    "culture-histoire"
-  ],
-  "19": [
-    "culture-histoire"
-  ],
-  "20": [
-    "culture-histoire"
-  ],
-  "21": [
-    "culture-histoire"
-  ],
-  "22": [
-    "culture-histoire"
-  ],
-  "23": [
-    "culture-histoire"
-  ],
-  "24": [
-    "culture-histoire"
-  ],
-  "25": [
-    "culture-histoire"
-  ],
-  "26": [
-    "culture-histoire"
-  ],
-  "27": [
-    "culture-histoire"
-  ],
-  "28": [
-    "culture-histoire"
-  ],
-  "29": [
-    "culture-histoire"
-  ],
-  "30": [
-    "culture-histoire"
-  ],
-  "31": [
-    "culture-histoire"
-  ],
-  "32": [
-    "culture-histoire"
-  ],
-  "33": [
-    "culture-histoire"
-  ],
-  "34": [
-    "culture-histoire"
-  ],
-  "35": [
-    "culture-histoire"
-  ],
-  "36": [
-    "culture-histoire"
-  ],
-  "37": [
-    "culture-histoire"
-  ],
-  "38": [
-    "culture-histoire"
-  ],
-  "39": [
-    "culture-histoire"
-  ],
-  "40": [
-    "culture-histoire"
-  ],
-  "41": [
-    "culture-histoire"
-  ],
-  "42": [
-    "culture-histoire"
-  ],
-  "43": [
-    "culture-histoire"
-  ],
-  "44": [
-    "culture-histoire"
-  ],
-  "45": [
-    "culture-histoire"
-  ],
-  "46": [
-    "culture-histoire"
-  ],
-  "47": [
-    "culture-histoire"
-  ],
-  "48": [
-    "culture-histoire"
-  ],
-  "49": [
-    "culture-histoire"
-  ],
-  "50": [
-    "culture-histoire"
-  ],
-  "51": [
-    "culture-histoire"
-  ],
-  "52": [
-    "culture-histoire"
-  ],
-  "53": [
-    "culture-histoire"
-  ],
-  "54": [
-    "culture-histoire"
-  ],
-  "55": [
-    "culture-histoire"
-  ],
-  "56": [
-    "culture-histoire"
-  ],
-  "57": [
-    "culture-histoire"
-  ],
-  "58": [
-    "culture-histoire"
-  ],
-  "59": [
-    "culture-histoire"
-  ],
-  "60": [
-    "culture-histoire"
-  ],
-  "61": [
-    "culture-histoire"
-  ],
-  "62": [
-    "culture-histoire"
-  ],
-  "63": [
-    "culture-histoire"
-  ],
-  "64": [
-    "culture-histoire"
-  ],
-  "65": [
-    "culture-histoire"
-  ],
-  "66": [
-    "culture-histoire"
-  ],
-  "67": [
-    "culture-histoire"
-  ],
-  "68": [
-    "culture-histoire"
-  ],
-  "69": [
-    "culture-histoire"
-  ],
-  "70": [
-    "culture-histoire"
-  ],
-  "71": [
-    "culture-histoire"
-  ],
-  "72": [
-    "culture-histoire",
-    "shopping",
-    "gastronomie",
-    "vie-nocturne",
-    "art-architecture"
-  ],
-  "73": [
-    "culture-histoire"
-  ],
-  "74": [
-    "culture-histoire"
-  ],
-  "75": [
-    "ville-thermale",
-    "nature-ecotourisme"
-  ],
-  "76": [
-    "culture-histoire"
-  ],
-  "77": [
-    "culture-histoire"
-  ],
-  "78": [
-    "culture-histoire"
-  ],
-  "79": [
-    "culture-histoire"
-  ],
-  "80": [
-    "culture-histoire"
-  ],
-  "81": [
-    "culture-histoire"
-  ],
-  "82": [
-    "culture-histoire"
-  ],
-  "83": [
-    "culture-histoire"
-  ],
-  "84": [
-    "culture-histoire"
-  ],
-  "85": [
-    "culture-histoire"
-  ],
-  "86": [
-    "culture-histoire"
-  ],
-  "87": [
-    "montagne",
-    "sports-hiver",
-    "randonnee"
-  ],
-  "88": [
-    "culture-histoire"
-  ],
-  "89": [
-    "culture-histoire"
-  ],
-  "90": [
-    "culture-histoire"
-  ],
-  "91": [
-    "culture-histoire"
-  ],
-  "92": [
-    "culture-histoire"
-  ],
-  "93": [
-    "culture-histoire"
-  ],
-  "94": [
-    "culture-histoire"
-  ],
-  "95": [
-    "culture-histoire"
-  ],
-  "96": [
-    "culture-histoire"
-  ],
-  "97": [
-    "culture-histoire"
-  ],
-  "98": [
-    "culture-histoire"
-  ],
-  "99": [
-    "culture-histoire"
-  ],
-  "100": [
-    "culture-histoire"
-  ],
-  "101": [
-    "culture-histoire"
-  ],
-  "102": [
-    "culture-histoire"
-  ],
-  "103": [
-    "culture-histoire"
-  ],
-  "104": [
-    "culture-histoire"
-  ],
-  "105": [
-    "culture-histoire"
-  ],
-  "106": [
-    "culture-histoire"
-  ],
-  "107": [
-    "culture-histoire"
-  ],
-  "108": [
-    "culture-histoire",
-    "shopping",
-    "gastronomie"
-  ],
-  "109": [
-    "culture-histoire"
-  ],
-  "110": [
-    "culture-histoire"
-  ],
-  "111": [
-    "culture-histoire"
-  ],
-  "112": [
-    "culture-histoire"
-  ],
-  "113": [
-    "culture-histoire"
-  ],
-  "114": [
-    "culture-histoire"
-  ],
-  "115": [
-    "culture-histoire"
-  ],
-  "116": [
-    "culture-histoire"
-  ],
-  "117": [
-    "culture-histoire"
-  ],
-  "118": [
-    "culture-histoire"
-  ],
-  "119": [
-    "culture-histoire"
-  ],
-  "120": [
-    "culture-histoire"
-  ],
-  "121": [
-    "culture-histoire"
-  ],
-  "122": [
-    "culture-histoire"
-  ],
-  "123": [
-    "plage-mer",
-    "sports-nautiques"
-  ],
-  "124": [
-    "culture-histoire"
-  ],
-  "125": [
-    "culture-histoire"
-  ],
-  "126": [
-    "culture-histoire"
-  ],
-  "127": [
-    "culture-histoire"
-  ],
-  "128": [
-    "culture-histoire"
-  ],
-  "129": [
-    "culture-histoire"
-  ],
-  "130": [
-    "culture-histoire"
-  ],
-  "131": [
-    "culture-histoire"
-  ],
-  "132": [
-    "culture-histoire"
-  ],
-  "133": [
-    "culture-histoire"
-  ],
-  "134": [
-    "culture-histoire"
-  ],
-  "135": [
-    "culture-histoire"
-  ],
-  "136": [
-    "culture-histoire"
-  ],
-  "137": [
-    "culture-histoire"
-  ],
-  "138": [
-    "culture-histoire"
-  ],
-  "139": [
-    "culture-histoire"
-  ],
-  "140": [
-    "culture-histoire"
-  ],
-  "141": [
-    "culture-histoire"
-  ],
-  "142": [
-    "culture-histoire"
-  ],
-  "143": [
-    "culture-histoire"
-  ],
-  "144": [
-    "culture-histoire"
-  ],
-  "145": [
-    "culture-histoire"
-  ],
-  "146": [
-    "culture-histoire"
-  ],
-  "147": [
-    "culture-histoire"
-  ],
-  "148": [
-    "culture-histoire"
-  ],
-  "149": [
-    "culture-histoire"
-  ],
-  "150": [
-    "plage-mer",
-    "sports-nautiques"
-  ],
-  "151": [
-    "culture-histoire"
-  ],
-  "152": [
-    "culture-histoire"
-  ],
-  "153": [
-    "culture-histoire"
-  ],
-  "154": [
-    "culture-histoire"
-  ],
-  "155": [
-    "culture-histoire"
-  ],
-  "156": [
-    "culture-histoire"
-  ],
-  "157": [
-    "culture-histoire"
-  ],
-  "158": [
-    "culture-histoire"
-  ],
-  "159": [
-    "culture-histoire"
-  ],
-  "160": [
-    "culture-histoire"
-  ],
-  "161": [
-    "culture-histoire"
-  ],
-  "162": [
-    "culture-histoire"
-  ],
-  "163": [
-    "culture-histoire"
-  ],
-  "164": [
-    "culture-histoire"
-  ],
-  "165": [
-    "kid-friendly"
-  ],
-  "166": [
-    "culture-histoire"
-  ],
-  "167": [
-    "culture-histoire"
-  ],
-  "168": [
-    "culture-histoire"
-  ],
-  "169": [
-    "culture-histoire"
-  ],
-  "170": [
-    "culture-histoire"
-  ],
-  "171": [
-    "culture-histoire"
-  ],
-  "172": [
-    "culture-histoire"
-  ],
-  "173": [
-    "culture-histoire"
-  ],
-  "174": [
-    "culture-histoire"
-  ],
-  "175": [
-    "culture-histoire"
-  ],
-  "176": [
-    "culture-histoire"
-  ],
-  "177": [
-    "culture-histoire"
-  ],
-  "178": [
-    "culture-histoire"
-  ],
-  "179": [
-    "culture-histoire"
-  ],
-  "180": [
-    "culture-histoire"
-  ],
-  "181": [
-    "culture-histoire"
-  ],
-  "182": [
-    "culture-histoire"
-  ],
-  "183": [
-    "culture-histoire"
-  ],
-  "184": [
-    "culture-histoire"
-  ],
-  "185": [
-    "plage-mer",
-    "sports-nautiques",
-    "vie-nocturne",
-    "art-architecture"
-  ],
-  "186": [
-    "culture-histoire"
-  ],
-  "187": [
-    "culture-histoire"
-  ],
-  "188": [
-    "culture-histoire"
-  ],
-  "189": [
-    "culture-histoire"
-  ],
-  "190": [
-    "culture-histoire"
-  ],
-  "191": [
-    "oenologie",
-    "gastronomie",
-    "art-architecture"
-  ],
-  "192": [
-    "culture-histoire"
-  ],
-  "193": [
-    "culture-histoire"
-  ],
-  "194": [
-    "culture-histoire"
-  ],
-  "195": [
-    "culture-histoire"
-  ],
-  "196": [
-    "culture-histoire"
-  ],
-  "197": [
-    "art-architecture"
-  ],
-  "198": [
-    "culture-histoire"
-  ],
-  "199": [
-    "culture-histoire"
-  ],
-  "200": [
-    "culture-histoire"
-  ],
-  "201": [
-    "culture-histoire"
-  ],
-  "202": [
-    "culture-histoire"
-  ],
-  "203": [
-    "culture-histoire"
-  ],
-  "204": [
-    "culture-histoire"
-  ],
-  "205": [
-    "culture-histoire"
-  ],
-  "206": [
-    "culture-histoire"
-  ],
-  "207": [
-    "culture-histoire"
-  ],
-  "208": [
-    "culture-histoire"
-  ],
-  "209": [
-    "culture-histoire"
-  ],
-  "210": [
-    "culture-histoire"
-  ],
-  "211": [
-    "culture-histoire"
-  ],
-  "212": [
-    "culture-histoire"
-  ],
-  "213": [
-    "culture-histoire"
-  ],
-  "214": [
-    "culture-histoire"
-  ],
-  "215": [
-    "culture-histoire"
-  ],
-  "216": [
-    "culture-histoire"
-  ],
-  "217": [
-    "culture-histoire"
-  ],
-  "218": [
-    "culture-histoire"
-  ],
-  "219": [
-    "culture-histoire"
-  ],
-  "220": [
-    "culture-histoire"
-  ],
-  "221": [
-    "culture-histoire"
-  ],
-  "222": [
-    "culture-histoire"
-  ],
-  "223": [
-    "culture-histoire"
-  ],
-  "224": [
-    "culture-histoire"
-  ],
-  "225": [
-    "culture-histoire"
-  ],
-  "226": [
-    "culture-histoire"
-  ],
-  "227": [
-    "culture-histoire"
-  ],
-  "228": [
-    "plage-mer",
-    "sports-nautiques",
-    "vie-nocturne",
-    "art-architecture"
-  ],
-  "229": [
-    "culture-histoire"
-  ],
-  "230": [
-    "culture-histoire"
-  ],
-  "231": [
-    "culture-histoire"
-  ],
-  "232": [
-    "culture-histoire"
-  ],
-  "233": [
-    "culture-histoire"
-  ],
-  "234": [
-    "culture-histoire"
-  ],
-  "235": [
-    "plage-mer",
-    "sports-nautiques"
-  ],
-  "236": [
-    "culture-histoire"
-  ],
-  "237": [
-    "culture-histoire"
-  ],
-  "238": [
-    "culture-histoire"
-  ],
-  "239": [
-    "culture-histoire"
-  ],
-  "240": [
-    "culture-histoire"
-  ],
-  "241": [
-    "culture-histoire"
-  ],
-  "242": [
-    "culture-histoire"
-  ],
-  "243": [
-    "culture-histoire"
-  ],
-  "244": [
-    "oenologie",
-    "gastronomie"
-  ],
-  "245": [
-    "culture-histoire"
-  ],
-  "246": [
-    "culture-histoire"
-  ],
-  "247": [
-    "culture-histoire"
-  ],
-  "248": [
-    "culture-histoire"
-  ],
-  "249": [
-    "culture-histoire"
-  ],
-  "250": [
-    "culture-histoire"
-  ],
-  "251": [
-    "culture-histoire"
-  ],
-  "252": [
-    "culture-histoire"
-  ],
-  "253": [
-    "culture-histoire"
-  ],
-  "254": [
-    "culture-histoire"
-  ],
-  "255": [
-    "culture-histoire"
-  ],
-  "256": [
-    "culture-histoire"
-  ],
-  "257": [
-    "art-architecture"
-  ],
-  "258": [
-    "culture-histoire"
-  ],
-  "259": [
-    "culture-histoire"
-  ],
-  "260": [
-    "culture-histoire"
-  ],
-  "261": [
-    "culture-histoire"
-  ],
-  "262": [
-    "culture-histoire"
-  ],
-  "263": [
-    "culture-histoire"
-  ],
-  "264": [
-    "culture-histoire"
-  ],
-  "265": [
-    "culture-histoire",
-    "shopping",
-    "gastronomie"
-  ],
-  "266": [
-    "culture-histoire"
-  ],
-  "267": [
-    "culture-histoire"
-  ],
-  "268": [
-    "culture-histoire"
-  ],
-  "269": [
-    "culture-histoire"
-  ],
-  "270": [
-    "culture-histoire"
-  ],
-  "271": [
-    "culture-histoire"
-  ],
-  "272": [
-    "ville-thermale",
-    "nature-ecotourisme"
-  ],
-  "273": [
-    "culture-histoire"
-  ],
-  "274": [
-    "culture-histoire"
-  ],
-  "275": [
-    "culture-histoire"
-  ],
-  "276": [
-    "culture-histoire"
-  ],
-  "277": [
-    "culture-histoire"
-  ],
-  "278": [
-    "culture-histoire"
-  ],
-  "279": [
-    "culture-histoire"
-  ],
-  "280": [
-    "culture-histoire"
-  ],
-  "281": [
-    "culture-histoire"
-  ],
-  "282": [
-    "culture-histoire"
-  ],
-  "283": [
-    "culture-histoire"
-  ],
-  "284": [
-    "culture-histoire"
-  ],
-  "285": [
-    "culture-histoire"
-  ],
-  "286": [
-    "culture-histoire"
-  ],
-  "287": [
-    "culture-histoire"
-  ],
-  "288": [
-    "culture-histoire"
-  ],
-  "289": [
-    "culture-histoire"
-  ],
-  "290": [
-    "culture-histoire"
-  ],
-  "291": [
-    "culture-histoire"
-  ],
-  "292": [
-    "culture-histoire"
-  ],
-  "293": [
-    "culture-histoire"
-  ],
-  "294": [
-    "culture-histoire"
-  ],
-  "295": [
-    "culture-histoire"
-  ],
-  "296": [
-    "culture-histoire"
-  ],
-  "297": [
-    "culture-histoire",
-    "shopping",
-    "gastronomie"
-  ],
-  "298": [
-    "plage-mer",
-    "sports-nautiques"
-  ],
-  "299": [
-    "culture-histoire"
-  ],
-  "300": [
-    "culture-histoire"
-  ],
-  "301": [
-    "culture-histoire"
-  ],
-  "302": [
-    "culture-histoire"
-  ],
-  "303": [
-    "culture-histoire"
-  ],
-  "304": [
-    "culture-histoire"
-  ],
-  "305": [
-    "culture-histoire"
-  ],
-  "306": [
-    "culture-histoire"
-  ],
-  "307": [
-    "culture-histoire"
-  ],
-  "308": [
-    "culture-histoire"
-  ],
-  "309": [
-    "culture-histoire"
-  ],
-  "310": [
-    "culture-histoire"
-  ],
-  "311": [
-    "culture-histoire"
-  ],
-  "312": [
-    "culture-histoire"
-  ],
-  "313": [
-    "culture-histoire"
-  ],
-  "314": [
-    "culture-histoire"
-  ],
-  "315": [
-    "culture-histoire"
-  ],
-  "316": [
-    "culture-histoire"
-  ],
-  "317": [
-    "culture-histoire"
-  ],
-  "318": [
-    "culture-histoire"
-  ],
-  "319": [
-    "culture-histoire"
-  ],
-  "320": [
-    "culture-histoire"
-  ],
-  "321": [
-    "culture-histoire"
-  ],
-  "322": [
-    "culture-histoire"
-  ],
-  "323": [
-    "culture-histoire"
-  ],
-  "324": [
-    "culture-histoire"
-  ],
-  "325": [
-    "culture-histoire"
-  ],
-  "326": [
-    "culture-histoire"
-  ],
-  "327": [
-    "culture-histoire"
-  ],
-  "328": [
-    "culture-histoire"
-  ],
-  "329": [
-    "culture-histoire"
-  ],
-  "330": [
-    "culture-histoire"
-  ],
-  "331": [
-    "culture-histoire"
-  ],
-  "332": [
-    "culture-histoire"
-  ],
-  "333": [
-    "culture-histoire"
-  ],
-  "334": [
-    "culture-histoire"
-  ],
-  "335": [
-    "culture-histoire"
-  ],
-  "336": [
-    "culture-histoire"
-  ],
-  "337": [
-    "culture-histoire",
-    "shopping",
-    "gastronomie",
-    "vie-nocturne",
-    "art-architecture"
-  ],
-  "338": [
-    "culture-histoire"
-  ],
-  "339": [
-    "culture-histoire"
-  ],
-  "340": [
-    "culture-histoire"
-  ],
-  "341": [
-    "culture-histoire"
-  ],
-  "342": [
-    "culture-histoire"
-  ],
-  "343": [
-    "culture-histoire"
-  ],
-  "344": [
-    "culture-histoire"
-  ],
-  "345": [
-    "oenologie",
-    "gastronomie",
-    "art-architecture"
-  ],
-  "346": [
-    "culture-histoire"
-  ],
-  "347": [
-    "culture-histoire"
-  ],
-  "348": [
-    "culture-histoire"
-  ],
-  "349": [
-    "culture-histoire"
-  ],
-  "350": [
-    "culture-histoire"
-  ],
-  "351": [
-    "culture-histoire"
-  ],
-  "352": [
-    "culture-histoire"
-  ],
-  "353": [
-    "culture-histoire"
-  ],
-  "354": [
-    "culture-histoire"
-  ],
-  "355": [
-    "culture-histoire"
-  ],
-  "356": [
-    "culture-histoire"
-  ],
-  "357": [
-    "culture-histoire"
-  ],
-  "358": [
-    "culture-histoire"
-  ],
-  "359": [
-    "culture-histoire"
-  ],
-  "360": [
-    "culture-histoire"
-  ],
-  "361": [
-    "culture-histoire"
-  ],
-  "362": [
-    "culture-histoire"
-  ],
-  "363": [
-    "culture-histoire"
-  ],
-  "364": [
-    "culture-histoire",
-    "shopping",
-    "gastronomie",
-    "vie-nocturne",
-    "art-architecture"
-  ],
-  "365": [
-    "culture-histoire"
-  ],
-  "366": [
-    "culture-histoire"
-  ],
-  "367": [
-    "culture-histoire"
-  ],
-  "368": [
-    "culture-histoire"
-  ],
-  "369": [
-    "culture-histoire"
-  ],
-  "370": [
-    "culture-histoire"
-  ],
-  "371": [
-    "culture-histoire"
-  ],
-  "372": [
-    "culture-histoire"
-  ],
-  "373": [
-    "culture-histoire"
-  ],
-  "374": [
-    "culture-histoire"
-  ],
-  "375": [
-    "culture-histoire"
-  ],
-  "376": [
-    "culture-histoire"
-  ],
-  "377": [
-    "culture-histoire"
-  ],
-  "378": [
-    "montagne",
-    "sports-hiver",
-    "randonnee"
-  ],
-  "379": [
-    "culture-histoire"
-  ],
-  "380": [
-    "culture-histoire"
-  ],
-  "381": [
-    "culture-histoire"
-  ],
-  "382": [
-    "culture-histoire"
-  ],
-  "383": [
-    "culture-histoire"
-  ],
-  "384": [
-    "culture-histoire"
-  ],
-  "385": [
-    "culture-histoire"
-  ],
-  "386": [
-    "culture-histoire"
-  ],
-  "387": [
-    "culture-histoire"
-  ],
-  "388": [
-    "culture-histoire"
-  ],
-  "389": [
-    "culture-histoire"
-  ],
-  "390": [
-    "culture-histoire"
-  ],
-  "391": [
-    "culture-histoire"
-  ],
-  "392": [
-    "culture-histoire"
-  ],
-  "393": [
-    "culture-histoire"
-  ],
-  "394": [
-    "culture-histoire"
-  ],
-  "395": [
-    "culture-histoire"
-  ],
-  "396": [
-    "culture-histoire"
-  ],
-  "397": [
-    "culture-histoire"
-  ],
-  "398": [
-    "culture-histoire"
-  ],
-  "399": [
-    "culture-histoire"
-  ],
-  "400": [
-    "art-architecture"
-  ],
-  "401": [
-    "culture-histoire"
-  ],
-  "402": [
-    "plage-mer",
-    "sports-nautiques"
-  ],
-  "403": [
-    "culture-histoire"
-  ],
-  "404": [
-    "culture-histoire"
-  ],
-  "405": [
-    "culture-histoire"
-  ],
-  "406": [
-    "culture-histoire"
-  ],
-  "407": [
-    "culture-histoire"
-  ],
-  "408": [
-    "culture-histoire"
-  ],
-  "409": [
-    "culture-histoire"
-  ],
-  "410": [
-    "culture-histoire"
-  ],
-  "411": [
-    "culture-histoire"
-  ],
-  "412": [
-    "culture-histoire"
-  ],
-  "413": [
-    "culture-histoire"
-  ],
-  "414": [
-    "culture-histoire"
-  ],
-  "415": [
-    "culture-histoire"
-  ],
-  "416": [
-    "culture-histoire"
-  ],
-  "417": [
-    "culture-histoire"
-  ],
-  "418": [
-    "culture-histoire"
-  ],
-  "419": [
-    "culture-histoire"
-  ],
-  "420": [
-    "culture-histoire"
-  ],
-  "421": [
-    "culture-histoire"
-  ],
-  "422": [
-    "culture-histoire"
-  ],
-  "423": [
-    "culture-histoire"
-  ],
-  "424": [
-    "culture-histoire"
-  ],
-  "425": [
-    "culture-histoire"
-  ],
-  "426": [
-    "culture-histoire"
-  ],
-  "427": [
-    "culture-histoire"
-  ],
-  "428": [
-    "culture-histoire"
-  ],
-  "429": [
-    "culture-histoire"
-  ],
-  "430": [
-    "culture-histoire"
-  ],
-  "431": [
-    "culture-histoire"
-  ],
-  "432": [
-    "culture-histoire"
-  ],
-  "433": [
-    "culture-histoire"
-  ],
-  "434": [
-    "culture-histoire"
-  ],
-  "435": [
-    "culture-histoire"
-  ],
-  "436": [
-    "culture-histoire"
-  ],
-  "437": [
-    "culture-histoire"
-  ],
-  "438": [
-    "culture-histoire"
-  ],
-  "439": [
-    "culture-histoire"
-  ],
-  "440": [
-    "culture-histoire"
-  ],
-  "441": [
-    "culture-histoire"
-  ],
-  "442": [
-    "culture-histoire"
-  ],
-  "443": [
-    "culture-histoire"
-  ],
-  "444": [
-    "culture-histoire"
-  ],
-  "445": [
-    "culture-histoire"
-  ],
-  "446": [
-    "culture-histoire"
-  ],
-  "447": [
-    "culture-histoire"
-  ],
-  "448": [
-    "culture-histoire"
-  ],
-  "449": [
-    "culture-histoire"
-  ],
-  "450": [
-    "culture-histoire"
-  ],
-  "451": [
-    "culture-histoire"
-  ],
-  "452": [
-    "culture-histoire"
-  ],
-  "453": [
-    "culture-histoire"
-  ],
-  "454": [
-    "culture-histoire"
-  ],
-  "455": [
-    "culture-histoire"
-  ],
-  "456": [
-    "culture-histoire"
-  ],
-  "457": [
-    "culture-histoire"
-  ],
-  "458": [
-    "culture-histoire"
-  ],
-  "459": [
-    "culture-histoire"
-  ],
-  "460": [
-    "culture-histoire"
-  ],
-  "461": [
-    "culture-histoire"
-  ],
-  "462": [
-    "culture-histoire"
-  ],
-  "463": [
-    "plage-mer",
-    "sports-nautiques"
-  ],
-  "464": [
-    "culture-histoire"
-  ],
-  "465": [
-    "culture-histoire"
-  ],
-  "466": [
-    "culture-histoire"
-  ],
-  "467": [
-    "culture-histoire"
-  ],
-  "468": [
-    "culture-histoire"
-  ],
-  "469": [
-    "culture-histoire"
-  ],
-  "470": [
-    "culture-histoire"
-  ],
-  "471": [
-    "culture-histoire"
-  ],
-  "472": [
-    "culture-histoire"
-  ],
-  "473": [
-    "culture-histoire"
-  ],
-  "474": [
-    "culture-histoire"
-  ],
-  "475": [
-    "culture-histoire"
-  ],
-  "476": [
-    "culture-histoire"
-  ],
-  "477": [
-    "culture-histoire"
-  ],
-  "478": [
-    "culture-histoire"
-  ],
-  "479": [
-    "culture-histoire"
-  ],
-  "480": [
-    "culture-histoire"
-  ],
-  "481": [
-    "culture-histoire"
-  ],
-  "482": [
-    "culture-histoire",
-    "shopping",
-    "gastronomie"
-  ],
-  "483": [
-    "culture-histoire"
-  ],
-  "484": [
-    "culture-histoire"
-  ],
-  "485": [
-    "culture-histoire"
-  ],
-  "486": [
-    "culture-histoire"
-  ],
-  "487": [
-    "culture-histoire"
-  ],
-  "488": [
-    "culture-histoire"
-  ],
-  "489": [
-    "culture-histoire"
-  ],
-  "490": [
-    "culture-histoire"
-  ],
-  "491": [
-    "culture-histoire"
-  ],
-  "492": [
-    "culture-histoire"
-  ],
-  "493": [
-    "culture-histoire"
-  ],
-  "494": [
-    "plage-mer",
-    "sports-nautiques"
-  ],
-  "495": [
-    "culture-histoire"
-  ],
-  "496": [
-    "culture-histoire"
-  ],
-  "497": [
-    "culture-histoire",
-    "shopping",
-    "gastronomie",
-    "vie-nocturne",
-    "art-architecture"
-  ],
-  "498": [
-    "culture-histoire"
-  ],
-  "499": [
-    "culture-histoire"
-  ],
-  "500": [
-    "culture-histoire"
-  ],
-  "501": [
-    "culture-histoire"
-  ],
-  "502": [
-    "culture-histoire"
-  ],
-  "503": [
-    "culture-histoire"
-  ],
-  "504": [
-    "oenologie",
-    "gastronomie"
-  ],
-  "505": [
-    "culture-histoire"
-  ],
-  "506": [
-    "culture-histoire"
-  ],
-  "507": [
-    "culture-histoire"
-  ],
-  "508": [
-    "culture-histoire"
-  ],
-  "509": [
-    "culture-histoire"
-  ],
-  "510": [
-    "culture-histoire"
-  ],
-  "511": [
-    "culture-histoire"
-  ],
-  "512": [
-    "culture-histoire"
-  ],
-  "513": [
-    "culture-histoire"
-  ],
-  "514": [
-    "culture-histoire"
-  ],
-  "515": [
-    "culture-histoire"
-  ],
-  "516": [
-    "culture-histoire"
-  ],
-  "517": [
-    "culture-histoire"
-  ],
-  "518": [
-    "culture-histoire"
-  ],
-  "519": [
-    "culture-histoire"
-  ],
-  "520": [
-    "culture-histoire"
-  ],
-  "521": [
-    "culture-histoire"
-  ],
-  "522": [
-    "culture-histoire"
-  ],
-  "523": [
-    "culture-histoire"
-  ],
-  "524": [
-    "culture-histoire"
-  ],
-  "525": [
-    "culture-histoire"
-  ],
-  "526": [
-    "culture-histoire"
-  ],
-  "527": [
-    "culture-histoire"
-  ],
-  "528": [
-    "culture-histoire"
-  ],
-  "529": [
-    "culture-histoire"
-  ],
-  "530": [
-    "culture-histoire"
-  ],
-  "531": [
-    "culture-histoire"
-  ],
-  "532": [
-    "culture-histoire"
-  ],
-  "533": [
-    "culture-histoire"
-  ],
-  "534": [
-    "culture-histoire"
-  ],
-  "535": [
-    "culture-histoire"
-  ],
-  "536": [
-    "culture-histoire"
-  ],
-  "537": [
-    "culture-histoire"
-  ],
-  "538": [
-    "culture-histoire"
-  ],
-  "539": [
-    "oenologie",
-    "gastronomie"
-  ],
-  "540": [
-    "culture-histoire"
-  ],
-  "541": [
-    "culture-histoire",
-    "shopping",
-    "gastronomie",
-    "art-architecture"
-  ],
-  "542": [
-    "culture-histoire"
-  ],
-  "543": [
-    "culture-histoire"
-  ],
-  "544": [
-    "culture-histoire"
-  ],
-  "545": [
-    "culture-histoire"
-  ],
-  "546": [
-    "culture-histoire"
-  ],
-  "547": [
-    "culture-histoire"
-  ],
-  "548": [
-    "culture-histoire"
-  ],
-  "549": [
-    "culture-histoire"
-  ],
-  "550": [
-    "culture-histoire"
-  ],
-  "551": [
-    "culture-histoire"
-  ],
-  "552": [
-    "culture-histoire"
-  ],
-  "553": [
-    "culture-histoire"
-  ],
-  "554": [
-    "culture-histoire"
-  ],
-  "555": [
-    "culture-histoire"
-  ],
-  "556": [
-    "culture-histoire"
-  ],
-  "557": [
-    "culture-histoire"
-  ],
-  "558": [
-    "culture-histoire"
-  ],
-  "559": [
-    "culture-histoire"
-  ],
-  "560": [
-    "culture-histoire"
-  ],
-  "561": [
-    "culture-histoire"
-  ],
-  "562": [
-    "montagne",
-    "sports-hiver",
-    "randonnee"
-  ],
-  "563": [
-    "culture-histoire"
-  ],
-  "564": [
-    "culture-histoire"
-  ],
-  "565": [
-    "culture-histoire"
-  ],
-  "566": [
-    "culture-histoire"
-  ],
-  "567": [
-    "culture-histoire"
-  ],
-  "568": [
-    "culture-histoire"
-  ],
-  "569": [
-    "culture-histoire"
-  ],
-  "570": [
-    "culture-histoire"
-  ],
-  "571": [
-    "culture-histoire"
-  ],
-  "572": [
-    "culture-histoire"
-  ],
-  "573": [
-    "culture-histoire"
-  ],
-  "574": [
-    "culture-histoire"
-  ],
-  "575": [
-    "culture-histoire"
-  ],
-  "576": [
-    "culture-histoire"
-  ],
-  "577": [
-    "culture-histoire"
-  ],
-  "578": [
-    "culture-histoire"
-  ],
-  "579": [
-    "culture-histoire"
-  ],
-  "580": [
-    "culture-histoire"
-  ],
-  "581": [
-    "culture-histoire"
-  ],
-  "582": [
-    "culture-histoire"
-  ],
-  "583": [
-    "culture-histoire"
-  ],
-  "584": [
-    "culture-histoire"
-  ],
-  "585": [
-    "culture-histoire"
-  ],
-  "586": [
-    "culture-histoire"
-  ],
-  "587": [
-    "culture-histoire"
-  ],
-  "588": [
-    "culture-histoire"
-  ],
-  "589": [
-    "culture-histoire"
-  ],
-  "590": [
-    "culture-histoire"
-  ],
-  "591": [
-    "culture-histoire"
-  ],
-  "592": [
-    "culture-histoire"
-  ],
-  "593": [
-    "culture-histoire"
-  ],
-  "594": [
-    "culture-histoire"
-  ],
-  "595": [
-    "culture-histoire"
-  ],
-  "596": [
-    "culture-histoire"
-  ],
-  "597": [
-    "culture-histoire"
-  ],
-  "598": [
-    "culture-histoire"
-  ],
-  "599": [
-    "culture-histoire"
-  ],
-  "600": [
-    "culture-histoire"
-  ],
-  "601": [
-    "culture-histoire"
-  ],
-  "602": [
-    "culture-histoire"
-  ],
-  "603": [
-    "culture-histoire"
-  ],
-  "604": [
-    "culture-histoire"
-  ],
-  "605": [
-    "culture-histoire"
-  ],
-  "606": [
-    "culture-histoire"
-  ],
-  "607": [
-    "culture-histoire"
-  ],
-  "608": [
-    "culture-histoire"
-  ],
-  "609": [
-    "culture-histoire"
-  ],
-  "610": [
-    "culture-histoire"
-  ],
-  "611": [
-    "culture-histoire"
-  ],
-  "612": [
-    "culture-histoire"
-  ],
-  "613": [
-    "culture-histoire"
-  ],
-  "614": [
-    "culture-histoire"
-  ],
-  "615": [
-    "culture-histoire"
-  ],
-  "616": [
-    "culture-histoire"
-  ],
-  "617": [
-    "culture-histoire"
-  ],
-  "618": [
-    "culture-histoire"
-  ],
-  "619": [
-    "culture-histoire"
-  ],
-  "620": [
-    "culture-histoire"
-  ],
-  "621": [
-    "culture-histoire"
-  ],
-  "622": [
-    "culture-histoire"
-  ],
-  "623": [
-    "culture-histoire"
-  ],
-  "624": [
-    "culture-histoire"
-  ],
-  "625": [
-    "culture-histoire"
-  ],
-  "626": [
-    "culture-histoire"
-  ],
-  "627": [
-    "culture-histoire"
-  ],
-  "628": [
-    "culture-histoire"
-  ],
-  "629": [
-    "culture-histoire"
-  ],
-  "630": [
-    "culture-histoire"
-  ],
-  "631": [
-    "culture-histoire"
-  ],
-  "632": [
-    "culture-histoire"
-  ],
-  "633": [
-    "culture-histoire"
-  ],
-  "634": [
-    "culture-histoire"
-  ],
-  "635": [
-    "culture-histoire"
-  ],
-  "636": [
-    "culture-histoire"
-  ],
-  "637": [
-    "plage-mer",
-    "sports-nautiques"
-  ],
-  "638": [
-    "culture-histoire"
-  ],
-  "639": [
-    "culture-histoire"
-  ],
-  "640": [
-    "culture-histoire"
-  ],
-  "641": [
-    "culture-histoire"
-  ],
-  "642": [
-    "culture-histoire"
-  ],
-  "643": [
-    "culture-histoire"
-  ],
-  "644": [
-    "culture-histoire"
-  ],
-  "645": [
-    "culture-histoire"
-  ],
-  "646": [
-    "culture-histoire"
-  ],
-  "647": [
-    "culture-histoire"
-  ],
-  "648": [
-    "culture-histoire"
-  ],
-  "649": [
-    "culture-histoire"
-  ],
-  "650": [
-    "culture-histoire"
-  ],
-  "651": [
-    "culture-histoire"
-  ],
-  "652": [
-    "culture-histoire"
-  ],
-  "653": [
-    "culture-histoire"
-  ],
-  "654": [
-    "culture-histoire"
-  ],
-  "655": [
-    "culture-histoire"
-  ],
-  "656": [
-    "culture-histoire"
-  ],
-  "657": [
-    "montagne",
-    "sports-hiver",
-    "randonnee"
-  ],
-  "658": [
-    "culture-histoire"
-  ],
-  "659": [
-    "culture-histoire"
-  ],
-  "660": [
-    "culture-histoire"
-  ],
-  "661": [
-    "culture-histoire"
-  ],
-  "662": [
-    "culture-histoire"
-  ],
-  "663": [
-    "culture-histoire"
-  ],
-  "664": [
-    "culture-histoire"
-  ],
-  "665": [
-    "culture-histoire"
-  ],
-  "666": [
-    "culture-histoire"
-  ],
-  "667": [
-    "culture-histoire"
-  ],
-  "668": [
-    "culture-histoire"
-  ],
-  "669": [
-    "culture-histoire"
-  ],
-  "670": [
-    "culture-histoire"
-  ],
-  "671": [
-    "culture-histoire"
-  ],
-  "672": [
-    "culture-histoire"
-  ],
-  "673": [
-    "culture-histoire"
-  ],
-  "674": [
-    "culture-histoire"
-  ],
-  "675": [
-    "culture-histoire"
-  ],
-  "676": [
-    "culture-histoire"
-  ],
-  "677": [
-    "culture-histoire"
-  ],
-  "678": [
-    "culture-histoire"
-  ],
-  "679": [
-    "culture-histoire"
-  ],
-  "680": [
-    "culture-histoire"
-  ],
-  "681": [
-    "culture-histoire"
-  ],
-  "682": [
-    "culture-histoire"
-  ],
-  "683": [
-    "culture-histoire"
-  ],
-  "684": [
-    "culture-histoire"
-  ],
-  "685": [
-    "culture-histoire"
-  ],
-  "686": [
-    "culture-histoire"
-  ],
-  "687": [
-    "culture-histoire"
-  ],
-  "688": [
-    "culture-histoire"
-  ],
-  "689": [
-    "culture-histoire"
-  ],
-  "690": [
-    "culture-histoire"
-  ],
-  "691": [
-    "culture-histoire"
-  ],
-  "692": [
-    "culture-histoire"
-  ],
-  "693": [
-    "culture-histoire"
-  ],
-  "694": [
-    "culture-histoire"
-  ],
-  "695": [
-    "culture-histoire"
-  ],
-  "696": [
-    "culture-histoire"
-  ],
-  "697": [
-    "culture-histoire"
-  ],
-  "698": [
-    "culture-histoire"
-  ],
-  "699": [
-    "culture-histoire"
-  ],
-  "700": [
-    "culture-histoire"
-  ],
-  "701": [
-    "culture-histoire"
-  ],
-  "702": [
-    "culture-histoire"
-  ],
-  "703": [
-    "culture-histoire"
-  ],
-  "704": [
-    "culture-histoire"
-  ],
-  "705": [
-    "culture-histoire"
-  ],
-  "706": [
-    "culture-histoire"
-  ],
-  "707": [
-    "culture-histoire"
-  ],
-  "708": [
-    "culture-histoire"
-  ],
-  "709": [
-    "culture-histoire"
-  ],
-  "710": [
-    "culture-histoire"
-  ],
-  "711": [
-    "culture-histoire"
-  ],
-  "712": [
-    "culture-histoire"
-  ],
-  "713": [
-    "oenologie",
-    "gastronomie",
-    "art-architecture"
-  ],
-  "714": [
-    "culture-histoire"
-  ],
-  "715": [
-    "culture-histoire"
-  ],
-  "716": [
-    "culture-histoire"
-  ],
-  "717": [
-    "culture-histoire"
-  ],
-  "718": [
-    "culture-histoire"
-  ],
-  "719": [
-    "culture-histoire"
-  ],
-  "720": [
-    "ville-thermale",
-    "nature-ecotourisme"
-  ],
-  "721": [
-    "culture-histoire"
-  ],
-  "722": [
-    "culture-histoire"
-  ],
-  "723": [
-    "culture-histoire"
-  ],
-  "724": [
-    "culture-histoire"
-  ],
-  "725": [
-    "culture-histoire"
-  ],
-  "726": [
-    "culture-histoire"
-  ],
-  "727": [
-    "culture-histoire"
-  ],
-  "728": [
-    "culture-histoire"
-  ],
-  "729": [
-    "culture-histoire"
-  ],
-  "730": [
-    "culture-histoire"
-  ],
-  "731": [
-    "culture-histoire"
-  ],
-  "732": [
-    "culture-histoire"
-  ],
-  "733": [
-    "culture-histoire"
-  ],
-  "734": [
-    "culture-histoire"
-  ],
-  "735": [
-    "culture-histoire"
-  ],
-  "736": [
-    "culture-histoire"
-  ],
-  "737": [
-    "culture-histoire"
-  ],
-  "738": [
-    "culture-histoire"
-  ],
-  "739": [
-    "culture-histoire"
-  ],
-  "740": [
-    "culture-histoire"
-  ],
-  "741": [
-    "culture-histoire"
-  ],
-  "742": [
-    "art-architecture"
-  ],
-  "743": [
-    "culture-histoire"
-  ],
-  "744": [
-    "culture-histoire"
-  ],
-  "745": [
-    "culture-histoire"
-  ],
-  "746": [
-    "culture-histoire"
-  ],
-  "747": [
-    "culture-histoire"
-  ],
-  "748": [
-    "culture-histoire"
-  ],
-  "749": [
-    "culture-histoire"
-  ],
-  "750": [
-    "culture-histoire"
-  ],
-  "751": [
-    "culture-histoire"
-  ],
-  "752": [
-    "culture-histoire"
-  ],
-  "753": [
-    "culture-histoire"
-  ],
-  "754": [
-    "culture-histoire"
-  ],
-  "755": [
-    "culture-histoire"
-  ],
-  "756": [
-    "culture-histoire"
-  ],
-  "757": [
-    "culture-histoire"
-  ],
-  "758": [
-    "culture-histoire"
-  ],
-  "759": [
-    "culture-histoire"
-  ],
-  "760": [
-    "culture-histoire"
-  ],
-  "761": [
-    "culture-histoire"
-  ],
-  "762": [
-    "culture-histoire"
-  ],
-  "763": [
-    "culture-histoire"
-  ],
-  "764": [
-    "culture-histoire"
-  ],
-  "765": [
-    "culture-histoire"
-  ],
-  "766": [
-    "plage-mer",
-    "sports-nautiques"
-  ],
-  "767": [
-    "culture-histoire"
-  ],
-  "768": [
-    "culture-histoire"
-  ],
-  "769": [
-    "culture-histoire"
-  ],
-  "770": [
-    "culture-histoire"
-  ],
-  "771": [
-    "culture-histoire"
-  ],
-  "772": [
-    "culture-histoire"
-  ],
-  "773": [
-    "culture-histoire"
-  ],
-  "774": [
-    "culture-histoire"
-  ],
-  "775": [
-    "culture-histoire"
-  ],
-  "776": [
-    "culture-histoire"
-  ],
-  "777": [
-    "culture-histoire"
-  ],
-  "778": [
-    "culture-histoire"
-  ],
-  "779": [
-    "culture-histoire"
-  ],
-  "780": [
-    "culture-histoire"
-  ],
-  "781": [
-    "culture-histoire"
-  ],
-  "782": [
-    "culture-histoire"
-  ],
-  "783": [
-    "culture-histoire"
-  ],
-  "784": [
-    "culture-histoire"
-  ],
-  "785": [
-    "culture-histoire"
-  ],
-  "786": [
-    "culture-histoire"
-  ],
-  "787": [
-    "culture-histoire"
-  ],
-  "788": [
-    "culture-histoire"
-  ],
-  "789": [
-    "culture-histoire"
-  ],
-  "790": [
-    "culture-histoire"
-  ],
-  "791": [
-    "culture-histoire"
-  ],
-  "792": [
-    "culture-histoire"
-  ],
-  "793": [
-    "culture-histoire"
-  ],
-  "794": [
-    "culture-histoire"
-  ],
-  "795": [
-    "culture-histoire"
-  ],
-  "796": [
-    "culture-histoire"
-  ],
-  "797": [
-    "culture-histoire"
-  ],
-  "798": [
-    "culture-histoire"
-  ],
-  "799": [
-    "culture-histoire"
-  ],
-  "800": [
-    "culture-histoire"
-  ],
-  "801": [
-    "culture-histoire"
-  ],
-  "802": [
-    "culture-histoire"
-  ],
-  "803": [
-    "culture-histoire"
-  ],
-  "804": [
-    "culture-histoire"
-  ],
-  "805": [
-    "culture-histoire"
-  ],
-  "806": [
-    "culture-histoire"
-  ],
-  "807": [
-    "culture-histoire"
-  ],
-  "808": [
-    "culture-histoire"
-  ],
-  "809": [
-    "culture-histoire"
-  ],
-  "810": [
-    "culture-histoire"
-  ],
-  "811": [
-    "culture-histoire"
-  ],
-  "812": [
-    "culture-histoire"
-  ],
-  "813": [
-    "culture-histoire"
-  ],
-  "814": [
-    "culture-histoire"
-  ],
-  "815": [
-    "culture-histoire"
-  ],
-  "816": [
-    "culture-histoire",
-    "shopping",
-    "gastronomie",
-    "vie-nocturne",
-    "art-architecture",
-    "oenologie"
-  ],
-  "817": [
-    "culture-histoire"
-  ],
-  "818": [
-    "culture-histoire"
-  ],
-  "819": [
-    "culture-histoire"
-  ],
-  "820": [
-    "culture-histoire"
-  ],
-  "821": [
-    "culture-histoire"
-  ],
-  "822": [
-    "culture-histoire"
-  ],
-  "823": [
-    "culture-histoire"
-  ],
-  "824": [
-    "culture-histoire"
-  ],
-  "825": [
-    "culture-histoire"
-  ],
-  "826": [
-    "culture-histoire"
-  ],
-  "827": [
-    "culture-histoire"
-  ],
-  "828": [
-    "culture-histoire"
-  ],
-  "829": [
-    "culture-histoire"
-  ],
-  "830": [
-    "culture-histoire"
-  ],
-  "831": [
-    "culture-histoire"
-  ],
-  "832": [
-    "culture-histoire"
-  ],
-  "833": [
-    "culture-histoire"
-  ],
-  "834": [
-    "culture-histoire"
-  ],
-  "835": [
-    "culture-histoire"
-  ],
-  "836": [
-    "culture-histoire"
-  ],
-  "837": [
-    "culture-histoire"
-  ],
-  "838": [
-    "culture-histoire"
-  ],
-  "839": [
-    "culture-histoire"
-  ],
-  "840": [
-    "culture-histoire"
-  ],
-  "841": [
-    "culture-histoire"
-  ],
-  "842": [
-    "culture-histoire"
-  ],
-  "843": [
-    "culture-histoire"
-  ],
-  "844": [
-    "culture-histoire"
-  ],
-  "845": [
-    "culture-histoire"
-  ],
-  "846": [
-    "culture-histoire"
-  ],
-  "847": [
-    "culture-histoire"
-  ],
-  "848": [
-    "culture-histoire"
-  ],
-  "849": [
-    "culture-histoire"
-  ],
-  "850": [
-    "culture-histoire"
-  ],
-  "851": [
-    "culture-histoire"
-  ],
-  "852": [
-    "culture-histoire"
-  ],
-  "853": [
-    "culture-histoire"
-  ],
-  "854": [
-    "culture-histoire"
-  ],
-  "855": [
-    "culture-histoire"
-  ],
-  "856": [
-    "culture-histoire",
-    "shopping",
-    "gastronomie",
-    "oenologie"
-  ],
-  "857": [
-    "culture-histoire"
-  ],
-  "858": [
-    "culture-histoire"
-  ],
-  "859": [
-    "culture-histoire"
-  ],
-  "860": [
-    "culture-histoire"
-  ],
-  "861": [
-    "culture-histoire"
-  ],
-  "862": [
-    "culture-histoire"
-  ],
-  "863": [
-    "culture-histoire"
-  ],
-  "864": [
-    "culture-histoire"
-  ],
-  "865": [
-    "culture-histoire"
-  ],
-  "866": [
-    "culture-histoire"
-  ],
-  "867": [
-    "culture-histoire"
-  ],
-  "868": [
-    "culture-histoire"
-  ],
-  "869": [
-    "culture-histoire"
-  ],
-  "870": [
-    "culture-histoire"
-  ],
-  "871": [
-    "culture-histoire"
-  ],
-  "872": [
-    "culture-histoire"
-  ],
-  "873": [
-    "culture-histoire"
-  ],
-  "874": [
-    "culture-histoire"
-  ],
-  "875": [
-    "culture-histoire"
-  ],
-  "876": [
-    "culture-histoire"
-  ],
-  "877": [
-    "culture-histoire"
-  ],
-  "878": [
-    "culture-histoire"
-  ],
-  "879": [
-    "culture-histoire"
-  ],
-  "880": [
-    "culture-histoire"
-  ],
-  "881": [
-    "culture-histoire"
-  ],
-  "882": [
-    "culture-histoire"
-  ],
-  "883": [
-    "culture-histoire"
-  ],
-  "884": [
-    "culture-histoire"
-  ],
-  "885": [
-    "culture-histoire"
-  ],
-  "886": [
-    "culture-histoire"
-  ],
-  "887": [
-    "culture-histoire",
-    "shopping",
-    "gastronomie",
-    "vie-nocturne",
-    "art-architecture"
-  ],
-  "888": [
-    "culture-histoire"
-  ],
-  "889": [
-    "culture-histoire"
-  ],
-  "890": [
-    "culture-histoire"
-  ],
-  "891": [
-    "culture-histoire"
-  ],
-  "892": [
-    "culture-histoire"
-  ],
-  "893": [
-    "culture-histoire"
-  ],
-  "894": [
-    "culture-histoire"
-  ],
-  "895": [
-    "culture-histoire"
-  ],
-  "896": [
-    "culture-histoire"
-  ],
-  "897": [
-    "culture-histoire"
-  ],
-  "898": [
-    "culture-histoire"
-  ],
-  "899": [
-    "culture-histoire"
-  ],
-  "900": [
-    "culture-histoire"
-  ],
-  "901": [
-    "culture-histoire"
-  ],
-  "902": [
-    "culture-histoire"
-  ],
-  "903": [
-    "oenologie",
-    "gastronomie"
-  ],
-  "904": [
-    "culture-histoire"
-  ],
-  "905": [
-    "culture-histoire"
-  ],
-  "906": [
-    "culture-histoire"
-  ],
-  "907": [
-    "culture-histoire"
-  ],
-  "908": [
-    "culture-histoire"
-  ],
-  "909": [
-    "culture-histoire"
-  ],
-  "910": [
-    "culture-histoire"
-  ],
-  "911": [
-    "culture-histoire"
-  ],
-  "912": [
-    "culture-histoire"
-  ],
-  "913": [
-    "culture-histoire"
-  ],
-  "914": [
-    "culture-histoire"
-  ],
-  "915": [
-    "culture-histoire"
-  ],
-  "916": [
-    "culture-histoire"
-  ],
-  "917": [
-    "culture-histoire"
-  ],
-  "918": [
-    "culture-histoire"
-  ],
-  "919": [
-    "culture-histoire"
-  ],
-  "920": [
-    "culture-histoire"
-  ],
-  "921": [
-    "culture-histoire"
-  ],
-  "922": [
-    "culture-histoire"
-  ],
-  "923": [
-    "culture-histoire"
-  ],
-  "924": [
-    "culture-histoire"
-  ],
-  "925": [
-    "culture-histoire"
-  ],
-  "926": [
-    "culture-histoire"
-  ],
-  "927": [
-    "culture-histoire"
-  ],
-  "928": [
-    "culture-histoire"
-  ],
-  "929": [
-    "culture-histoire"
-  ],
-  "930": [
-    "culture-histoire"
-  ],
-  "931": [
-    "culture-histoire"
-  ],
-  "932": [
-    "culture-histoire"
-  ],
-  "933": [
-    "culture-histoire"
-  ],
-  "934": [
-    "culture-histoire"
-  ],
-  "935": [
-    "culture-histoire"
-  ],
-  "936": [
-    "culture-histoire"
-  ],
-  "937": [
-    "culture-histoire"
-  ],
-  "938": [
-    "culture-histoire"
-  ],
-  "939": [
-    "culture-histoire"
-  ],
-  "940": [
-    "culture-histoire"
-  ],
-  "941": [
-    "culture-histoire"
-  ],
-  "942": [
-    "culture-histoire"
-  ],
-  "943": [
-    "culture-histoire"
-  ],
-  "944": [
-    "culture-histoire"
-  ],
-  "945": [
-    "culture-histoire"
-  ],
-  "946": [
-    "culture-histoire"
-  ],
-  "947": [
-    "culture-histoire"
-  ],
-  "948": [
-    "culture-histoire"
-  ],
-  "949": [
-    "culture-histoire"
-  ],
-  "950": [
-    "culture-histoire"
-  ],
-  "951": [
-    "culture-histoire"
-  ],
-  "952": [
-    "culture-histoire"
-  ],
-  "953": [
-    "culture-histoire"
-  ],
-  "954": [
-    "culture-histoire"
-  ],
-  "955": [
-    "culture-histoire"
-  ],
-  "956": [
-    "culture-histoire"
-  ],
-  "957": [
-    "culture-histoire"
-  ],
-  "958": [
-    "culture-histoire"
-  ],
-  "959": [
-    "culture-histoire"
-  ],
-  "960": [
-    "culture-histoire"
-  ],
-  "961": [
-    "culture-histoire"
-  ],
-  "962": [
-    "culture-histoire"
-  ],
-  "963": [
-    "culture-histoire"
-  ],
-  "964": [
-    "montagne",
-    "sports-hiver",
-    "randonnee"
-  ],
-  "965": [
-    "culture-histoire"
-  ],
-  "966": [
-    "culture-histoire"
-  ],
-  "967": [
-    "culture-histoire"
-  ],
-  "968": [
-    "culture-histoire"
-  ],
-  "969": [
-    "culture-histoire"
-  ],
-  "970": [
-    "culture-histoire"
-  ],
-  "971": [
-    "culture-histoire"
-  ],
-  "972": [
-    "culture-histoire"
-  ],
-  "973": [
-    "culture-histoire"
-  ],
-  "974": [
-    "culture-histoire"
-  ],
-  "975": [
-    "culture-histoire"
-  ],
-  "976": [
-    "culture-histoire"
-  ],
-  "977": [
-    "culture-histoire"
-  ],
-  "978": [
-    "culture-histoire"
-  ],
-  "979": [
-    "culture-histoire"
-  ],
-  "980": [
-    "culture-histoire"
-  ],
-  "981": [
-    "culture-histoire"
-  ],
-  "982": [
-    "culture-histoire"
-  ],
-  "983": [
-    "culture-histoire"
-  ],
-  "984": [
-    "culture-histoire"
-  ],
-  "985": [
-    "culture-histoire"
-  ],
-  "986": [
-    "culture-histoire"
-  ],
-  "987": [
-    "culture-histoire"
-  ],
-  "988": [
-    "culture-histoire"
-  ],
-  "989": [
-    "culture-histoire"
-  ],
-  "990": [
-    "culture-histoire"
-  ],
-  "991": [
-    "culture-histoire"
-  ],
-  "992": [
-    "culture-histoire"
-  ],
-  "993": [
-    "culture-histoire"
-  ],
-  "994": [
-    "culture-histoire"
-  ],
-  "995": [
-    "culture-histoire"
-  ],
-  "996": [
-    "culture-histoire"
-  ],
-  "997": [
-    "culture-histoire"
-  ],
-  "998": [
-    "culture-histoire"
-  ],
-  "999": [
-    "culture-histoire"
-  ],
-  "1000": [
-    "culture-histoire"
-  ],
-  "1001": [
-    "culture-histoire"
-  ],
-  "1002": [
-    "culture-histoire"
-  ],
-  "1003": [
-    "culture-histoire"
-  ],
-  "1004": [
-    "culture-histoire"
-  ],
-  "1005": [
-    "culture-histoire"
-  ],
-  "1006": [
-    "culture-histoire"
-  ],
-  "1007": [
-    "culture-histoire"
-  ],
-  "1008": [
-    "culture-histoire"
-  ],
-  "1009": [
-    "culture-histoire"
-  ],
-  "1010": [
-    "culture-histoire"
-  ],
-  "1011": [
-    "culture-histoire"
-  ],
-  "1012": [
-    "culture-histoire"
-  ],
-  "1013": [
-    "culture-histoire"
-  ],
-  "1014": [
-    "culture-histoire"
-  ],
-  "1015": [
-    "culture-histoire"
-  ],
-  "1016": [
-    "culture-histoire"
-  ],
-  "1017": [
-    "art-architecture"
-  ],
-  "1018": [
-    "culture-histoire"
-  ],
-  "1019": [
-    "culture-histoire"
-  ],
-  "1020": [
-    "culture-histoire"
-  ],
-  "1021": [
-    "culture-histoire"
-  ],
-  "1022": [
-    "culture-histoire"
-  ],
-  "1023": [
-    "culture-histoire"
-  ],
-  "1024": [
-    "culture-histoire"
-  ],
-  "1025": [
-    "culture-histoire"
-  ],
-  "1026": [
-    "culture-histoire"
-  ],
-  "1027": [
-    "culture-histoire"
-  ],
-  "1028": [
-    "culture-histoire"
-  ],
-  "1029": [
-    "culture-histoire"
-  ],
-  "1030": [
-    "culture-histoire"
-  ],
-  "1031": [
-    "culture-histoire"
-  ],
-  "1032": [
-    "culture-histoire"
-  ],
-  "1033": [
-    "culture-histoire"
-  ],
-  "1034": [
-    "culture-histoire"
-  ],
-  "1035": [
-    "culture-histoire"
-  ],
-  "1036": [
-    "culture-histoire"
-  ],
-  "1037": [
-    "culture-histoire"
-  ],
-  "1038": [
-    "culture-histoire"
-  ],
-  "1039": [
-    "culture-histoire"
-  ],
-  "1040": [
-    "culture-histoire"
-  ],
-  "1041": [
-    "culture-histoire"
-  ],
-  "1042": [
-    "culture-histoire"
-  ],
-  "1043": [
-    "art-architecture"
-  ],
-  "1044": [
-    "culture-histoire"
-  ],
-  "1045": [
-    "culture-histoire"
-  ],
-  "1046": [
-    "culture-histoire"
-  ],
-  "1047": [
-    "culture-histoire"
-  ],
-  "1048": [
-    "culture-histoire"
-  ],
-  "1049": [
-    "culture-histoire"
-  ],
-  "1050": [
-    "culture-histoire"
-  ],
-  "1051": [
-    "culture-histoire"
-  ],
-  "1052": [
-    "culture-histoire"
-  ],
-  "1053": [
-    "culture-histoire"
-  ],
-  "1054": [
-    "culture-histoire"
-  ],
-  "1055": [
-    "culture-histoire"
-  ],
-  "1056": [
-    "culture-histoire"
-  ],
-  "1057": [
-    "culture-histoire"
-  ],
-  "1058": [
-    "culture-histoire"
-  ],
-  "1059": [
-    "culture-histoire"
-  ],
-  "1060": [
-    "culture-histoire"
-  ],
-  "1061": [
-    "culture-histoire"
-  ],
-  "1062": [
-    "culture-histoire"
-  ],
-  "1063": [
-    "culture-histoire"
-  ],
-  "1064": [
-    "culture-histoire"
-  ],
-  "1065": [
-    "culture-histoire"
-  ],
-  "1066": [
-    "culture-histoire"
-  ],
-  "1067": [
-    "plage-mer",
-    "sports-nautiques",
-    "vie-nocturne",
-    "art-architecture"
-  ],
-  "1068": [
-    "culture-histoire"
-  ],
-  "1069": [
-    "culture-histoire"
-  ],
-  "1070": [
-    "culture-histoire"
-  ],
-  "1071": [
-    "culture-histoire"
-  ],
-  "1072": [
-    "culture-histoire"
-  ],
-  "1073": [
-    "culture-histoire"
-  ],
-  "1074": [
-    "culture-histoire"
-  ],
-  "1075": [
-    "culture-histoire"
-  ],
-  "1076": [
-    "culture-histoire"
-  ],
-  "1077": [
-    "culture-histoire"
-  ],
-  "1078": [
-    "culture-histoire"
-  ],
-  "1079": [
-    "culture-histoire"
-  ],
-  "1080": [
-    "culture-histoire"
-  ],
-  "1081": [
-    "culture-histoire"
-  ],
-  "1082": [
-    "culture-histoire"
-  ],
-  "1083": [
-    "culture-histoire"
-  ],
-  "1084": [
-    "culture-histoire"
-  ],
-  "1085": [
-    "culture-histoire"
-  ],
-  "1086": [
-    "culture-histoire"
-  ],
-  "1087": [
-    "culture-histoire"
-  ],
-  "1088": [
-    "culture-histoire"
-  ],
-  "1089": [
-    "culture-histoire"
-  ],
-  "1090": [
-    "culture-histoire"
-  ],
-  "1091": [
-    "culture-histoire"
-  ],
-  "1092": [
-    "culture-histoire"
-  ],
-  "1093": [
-    "culture-histoire"
-  ],
-  "1094": [
-    "culture-histoire"
-  ],
-  "1095": [
-    "culture-histoire"
-  ],
-  "1096": [
-    "culture-histoire"
-  ],
-  "1097": [
-    "culture-histoire"
-  ],
-  "1098": [
-    "culture-histoire"
-  ],
-  "1099": [
-    "culture-histoire"
-  ],
-  "1100": [
-    "culture-histoire"
-  ],
-  "1101": [
-    "culture-histoire"
-  ],
-  "1102": [
-    "culture-histoire"
-  ],
-  "1103": [
-    "culture-histoire"
-  ],
-  "1104": [
-    "culture-histoire"
-  ],
-  "1105": [
-    "culture-histoire"
-  ],
-  "1106": [
-    "culture-histoire"
-  ],
-  "1107": [
-    "culture-histoire"
-  ],
-  "1108": [
-    "culture-histoire"
-  ],
-  "1109": [
-    "culture-histoire"
-  ],
-  "1110": [
-    "culture-histoire"
-  ],
-  "1111": [
-    "culture-histoire"
-  ],
-  "1112": [
-    "culture-histoire"
-  ],
-  "1113": [
-    "culture-histoire"
-  ],
-  "1114": [
-    "culture-histoire"
-  ],
-  "1115": [
-    "culture-histoire"
-  ],
-  "1116": [
-    "culture-histoire"
-  ],
-  "1117": [
-    "culture-histoire"
-  ],
-  "1118": [
-    "culture-histoire"
-  ],
-  "1119": [
-    "culture-histoire"
-  ],
-  "1120": [
-    "culture-histoire"
-  ],
-  "1121": [
-    "culture-histoire"
-  ],
-  "1122": [
-    "culture-histoire"
-  ],
-  "1123": [
-    "culture-histoire"
-  ],
-  "1124": [
-    "culture-histoire"
-  ],
-  "1125": [
-    "culture-histoire"
-  ],
-  "1126": [
-    "culture-histoire"
-  ],
-  "1127": [
-    "culture-histoire"
-  ],
-  "1128": [
-    "culture-histoire"
-  ],
-  "1129": [
-    "culture-histoire"
-  ],
-  "1130": [
-    "culture-histoire"
-  ],
-  "1131": [
-    "culture-histoire"
-  ],
-  "1132": [
-    "culture-histoire"
-  ],
-  "1133": [
-    "culture-histoire"
-  ],
-  "1134": [
-    "culture-histoire"
-  ],
-  "1135": [
-    "culture-histoire"
-  ],
-  "1136": [
-    "culture-histoire"
-  ],
-  "1137": [
-    "culture-histoire"
-  ],
-  "1138": [
-    "culture-histoire"
-  ],
-  "1139": [
-    "culture-histoire"
-  ],
-  "1140": [
-    "culture-histoire"
-  ],
-  "1141": [
-    "plage-mer",
-    "sports-nautiques"
-  ],
-  "1142": [
-    "culture-histoire"
-  ],
-  "1143": [
-    "culture-histoire",
-    "shopping",
-    "gastronomie",
-    "vie-nocturne",
-    "art-architecture"
-  ],
-  "1144": [
-    "culture-histoire"
-  ],
-  "1145": [
-    "culture-histoire"
-  ],
-  "1146": [
-    "culture-histoire"
-  ],
-  "1147": [
-    "culture-histoire"
-  ],
-  "1148": [
-    "culture-histoire"
-  ],
-  "1149": [
-    "culture-histoire"
-  ],
-  "1150": [
-    "culture-histoire"
-  ],
-  "1151": [
-    "culture-histoire"
-  ],
-  "1152": [
-    "culture-histoire"
-  ],
-  "1153": [
-    "culture-histoire"
-  ],
-  "1154": [
-    "culture-histoire"
-  ],
-  "1155": [
-    "plage-mer",
-    "sports-nautiques",
-    "vie-nocturne",
-    "art-architecture"
-  ],
-  "1156": [
-    "culture-histoire"
-  ],
-  "1157": [
-    "culture-histoire"
-  ],
-  "1158": [
-    "culture-histoire"
-  ],
-  "1159": [
-    "culture-histoire"
-  ],
-  "1160": [
-    "culture-histoire"
-  ],
-  "1161": [
-    "culture-histoire"
-  ],
-  "1162": [
-    "culture-histoire"
-  ],
-  "1163": [
-    "culture-histoire"
-  ],
-  "1164": [
-    "culture-histoire"
-  ],
-  "1165": [
-    "culture-histoire"
-  ],
-  "1166": [
-    "culture-histoire"
-  ],
-  "1167": [
-    "culture-histoire"
-  ],
-  "1168": [
-    "culture-histoire"
-  ],
-  "1169": [
-    "culture-histoire"
-  ],
-  "1170": [
-    "culture-histoire"
-  ],
-  "1171": [
-    "culture-histoire"
-  ],
-  "1172": [
-    "culture-histoire"
-  ],
-  "1173": [
-    "culture-histoire"
-  ],
-  "1174": [
-    "culture-histoire"
-  ],
-  "1175": [
-    "culture-histoire"
-  ],
-  "1176": [
-    "culture-histoire"
-  ],
-  "1177": [
-    "culture-histoire"
-  ],
-  "1178": [
-    "culture-histoire"
-  ],
-  "1179": [
-    "culture-histoire"
-  ],
-  "1180": [
-    "culture-histoire"
-  ],
-  "1181": [
-    "culture-histoire"
-  ],
-  "1182": [
-    "culture-histoire"
-  ],
-  "1183": [
-    "culture-histoire"
-  ],
-  "1184": [
-    "culture-histoire"
-  ],
-  "1185": [
-    "culture-histoire"
-  ],
-  "1186": [
-    "culture-histoire"
-  ],
-  "1187": [
-    "culture-histoire"
-  ],
-  "1188": [
-    "culture-histoire"
-  ],
-  "1189": [
-    "plage-mer",
-    "sports-nautiques",
-    "vie-nocturne",
-    "art-architecture"
-  ],
-  "1190": [
-    "culture-histoire"
-  ],
-  "1191": [
-    "culture-histoire"
-  ],
-  "1192": [
-    "culture-histoire"
-  ],
-  "1193": [
-    "culture-histoire"
-  ],
-  "1194": [
-    "culture-histoire",
-    "shopping",
-    "gastronomie",
-    "oenologie",
-    "art-architecture"
-  ],
-  "1195": [
-    "culture-histoire"
-  ],
-  "1196": [
-    "culture-histoire"
-  ],
-  "1197": [
-    "culture-histoire"
-  ],
-  "1198": [
-    "culture-histoire"
-  ],
-  "1199": [
-    "culture-histoire"
-  ],
-  "1200": [
-    "culture-histoire"
-  ]
+
+const W = 'https://fr.wikipedia.org/wiki/';
+const SANDRE = 'https://www.sandre.eaufrance.fr/geo/PlanEau/';
+
+function tag(label: CityLabel, reason: string, source: string, linkLabel: string, confidence = 90): TagEvidence {
+  return { label, reason, source, linkLabel, confidence };
+}
+
+export const stationLabels: Record<number, StationData> = {
+  // ─── Paris & Île-de-France ────────────────────────────────────────────────
+  1: {
+    description: 'Paris, capitale de la France, est une métropole mondiale réputée pour ses musées, sa gastronomie et son architecture haussmannienne.',
+    wikipediaUrl: W + 'Paris',
+    tags: [
+      tag('culture-histoire', 'Plus de 130 musées dont le Louvre et le Musée d\'Orsay', W + 'Paris', 'Découvrir Paris', 100),
+      tag('gastronomie', 'Capitale gastronomique mondiale, restaurants étoilés Michelin', W + 'Gastronomie_française', 'Voir la gastronomie parisienne', 100),
+      tag('art-architecture', 'Tour Eiffel, Notre-Dame, architecture haussmannienne classée', W + 'Architecture_de_Paris', 'Voir l\'architecture parisienne', 100),
+      tag('shopping', 'Champs-Élysées, Marais, Grands Boulevards', W + 'Commerce_à_Paris', 'Voir le shopping parisien', 95),
+    ],
+  },
+  2: {
+    description: 'Paris, capitale de la France.',
+    wikipediaUrl: W + 'Paris',
+    tags: [
+      tag('culture-histoire', 'Plus de 130 musées dont le Louvre et le Musée d\'Orsay', W + 'Paris', 'Découvrir Paris', 100),
+      tag('gastronomie', 'Capitale gastronomique mondiale', W + 'Gastronomie_française', 'Voir la gastronomie', 100),
+      tag('art-architecture', 'Tour Eiffel, Notre-Dame, architecture haussmannienne', W + 'Architecture_de_Paris', 'Voir l\'architecture', 100),
+    ],
+  },
+  3: {
+    description: 'Paris Montparnasse, quartier culturel et artistique.',
+    wikipediaUrl: W + 'Montparnasse',
+    tags: [
+      tag('culture-histoire', 'Quartier Montparnasse, musées, cimetière célèbre', W + 'Montparnasse', 'Découvrir Montparnasse', 100),
+      tag('gastronomie', 'Crêperies bretonnes, brasseries historiques', W + 'Gastronomie_française', 'Voir la gastronomie', 90),
+    ],
+  },
+  4: {
+    description: 'Paris Saint-Lazare, quartier des grands magasins et de l\'Opéra.',
+    wikipediaUrl: W + 'Paris',
+    tags: [
+      tag('culture-histoire', 'Opéra Garnier, Musée de l\'Orangerie, Palais Royal', W + 'Opéra_Garnier', 'Voir l\'Opéra Garnier', 100),
+      tag('shopping', 'Galeries Lafayette, Printemps Haussmann', W + 'Galeries_Lafayette', 'Voir les grands magasins', 100),
+    ],
+  },
+  5: {
+    description: 'Paris Est, porte vers l\'Alsace, la Champagne et l\'Europe centrale.',
+    wikipediaUrl: W + 'Paris',
+    tags: [
+      tag('culture-histoire', 'Canal Saint-Martin, quartiers animés du 10e', W + 'Canal_Saint-Martin', 'Voir le Canal Saint-Martin', 90),
+    ],
+  },
+  6: {
+    description: 'Paris Bercy, quartier vivant et culturel.',
+    wikipediaUrl: W + 'Paris',
+    tags: [
+      tag('culture-histoire', 'Bercy Village, Cinémathèque, Bois de Vincennes', W + 'Paris', 'Voir Paris', 85),
+      tag('gastronomie', 'Marché d\'Aligre, restaurants du 12e arrondissement', W + 'Gastronomie_française', 'Voir la gastronomie', 80),
+    ],
+  },
+  7: {
+    description: 'Paris Austerlitz, quartier latin et Museum national.',
+    wikipediaUrl: W + 'Paris',
+    tags: [
+      tag('culture-histoire', 'Museum national d\'Histoire naturelle, Jardin des plantes', W + 'Muséum_national_d\'Histoire_naturelle', 'Voir le Museum', 90),
+      tag('gastronomie', 'Quartier latin, restaurants du 5e arrondissement', W + 'Gastronomie_française', 'Voir la gastronomie', 80),
+    ],
+  },
+  8: {
+    description: 'Marne-la-Vallée accueille Disneyland Paris, premier parc d\'attractions européen.',
+    wikipediaUrl: W + 'Disneyland_Paris',
+    tags: [
+      tag('kid-friendly', 'Disneyland Paris, 1er parc d\'attractions d\'Europe', W + 'Disneyland_Paris', 'Voir Disneyland Paris', 100),
+    ],
+  },
+  9: {
+    description: 'Versailles est connue pour son château classé UNESCO, résidence des rois de France.',
+    wikipediaUrl: W + 'Versailles',
+    tags: [
+      tag('culture-histoire', 'Château de Versailles classé UNESCO, jardins Le Nôtre', W + 'Château_de_Versailles', 'Voir le Château de Versailles', 100),
+      tag('art-architecture', 'Galerie des Glaces, architecture Louis XIV', W + 'Château_de_Versailles', 'Voir l\'architecture', 100),
+    ],
+  },
+
+  // ─── Auvergne-Rhône-Alpes ────────────────────────────────────────────────
+  10: {
+    description: 'Lyon, capitale des Gaules classée UNESCO, reconnue comme la capitale gastronomique de la France.',
+    wikipediaUrl: W + 'Lyon',
+    tags: [
+      tag('gastronomie', 'Capitale gastronomique de France, bouchons lyonnais, Paul Bocuse', W + 'Gastronomie_lyonnaise', 'Découvrir la gastronomie lyonnaise', 100),
+      tag('culture-histoire', 'Vieux Lyon classé UNESCO, musée gallo-romain, traboules', W + 'Vieux-Lyon', 'Voir le Vieux Lyon', 100),
+    ],
+  },
+  11: {
+    description: 'Lyon Perrache, au cœur de la presqu\'île lyonnaise.',
+    wikipediaUrl: W + 'Lyon',
+    tags: [
+      tag('gastronomie', 'Capitale gastronomique de France, bouchons lyonnais', W + 'Gastronomie_lyonnaise', 'Découvrir la gastronomie lyonnaise', 100),
+      tag('culture-histoire', 'Vieux Lyon classé UNESCO, traboules', W + 'Vieux-Lyon', 'Voir le Vieux Lyon', 100),
+    ],
+  },
+  12: {
+    description: 'Grenoble est une ville universitaire au pied des Alpes, porte d\'entrée vers de nombreuses stations de ski.',
+    wikipediaUrl: W + 'Grenoble',
+    tags: [
+      tag('montagne', 'Grenoble entourée de 3 massifs : Belledonne, Chartreuse, Vercors', W + 'Grenoble', 'Voir Grenoble', 100),
+      tag('sports-hiver', 'Accès à Chamrousse, Les Deux Alpes, Alpe d\'Huez', W + 'Chamrousse', 'Voir les stations de ski', 95),
+      tag('randonnee', 'Parc Naturel Régional du Vercors à 20km, GR91', 'https://www.pnr-vercors.fr/', 'Voir le Parc du Vercors', 95),
+    ],
+  },
+  13: {
+    description: 'Chambéry est la préfecture de la Savoie, proche du Lac du Bourget, plus grand lac naturel de France.',
+    wikipediaUrl: W + 'Chambéry',
+    tags: [
+      tag('montagne', 'Préfecture de Savoie, massif des Bauges à 15km', W + 'Chambéry', 'Voir Chambéry', 95),
+      tag('lacs-rivieres', 'Lac du Bourget (4 450 ha), plus grand lac naturel de France, à 8km', SANDRE + 'FRF44', 'Voir le Lac du Bourget sur SANDRE', 100),
+      tag('sports-hiver', 'Accès aux Saisies, Porte des Alpes, Belledonne', W + 'Savoie', 'Voir les stations', 90),
+      tag('randonnee', 'Parc Naturel Régional du Massif des Bauges à 15km', 'https://www.parcdesbauges.com/', 'Voir le Parc des Bauges', 90),
+    ],
+  },
+  14: {
+    description: 'Annecy, surnommée la "Venise des Alpes", est une ville de Haute-Savoie bordée d\'un lac aux eaux cristallines.',
+    wikipediaUrl: W + 'Annecy',
+    tags: [
+      tag('lacs-rivieres', 'Lac d\'Annecy (2 727 ha), l\'un des lacs les plus purs d\'Europe', SANDRE + 'FRF10', 'Voir le Lac d\'Annecy sur SANDRE', 100),
+      tag('montagne', 'Haute-Savoie, massif des Aravis, vue sur les Alpes', W + 'Annecy', 'Voir Annecy', 95),
+      tag('randonnee', 'Tour du Lac d\'Annecy, Parc des Bauges à 20km', 'https://www.cirkwi.com/fr/circuit/21009-tour-du-lac-d-annecy', 'Voir le tour du lac', 95),
+      tag('sports-hiver', 'La Clusaz, Le Grand-Bornand à 30km', W + 'La_Clusaz', 'Voir La Clusaz', 85),
+    ],
+  },
+  15: {
+    description: 'Valence est la préfecture de la Drôme, porte d\'entrée de la Drôme provençale et des vignobles du Rhône.',
+    wikipediaUrl: W + 'Valence_(Drôme)',
+    tags: [
+      tag('gastronomie', 'Vignobles de Crozes-Hermitage AOC, cuisine provençale', 'https://www.inter-rhone.com/', 'Voir les vins de la Vallée du Rhône', 90),
+      tag('oenologie', 'AOC Crozes-Hermitage, Hermitage, Cornas à 15km', 'https://www.inter-rhone.com/', 'Voir les AOC du Rhône Nord', 95),
+    ],
+  },
+  16: {
+    description: 'Saint-Étienne est une ville industrielle reconvertie en capitale du design.',
+    wikipediaUrl: W + 'Saint-Étienne',
+    tags: [
+      tag('culture-histoire', 'Ville Créative UNESCO du design, musée d\'art moderne', W + 'Saint-Étienne', 'Voir Saint-Étienne', 85),
+      tag('art-architecture', 'Cité du Design, patrimoine industriel', W + 'Cité_du_Design', 'Voir la Cité du Design', 90),
+    ],
+  },
+  17: {
+    description: 'Clermont-Ferrand est la préfecture du Puy-de-Dôme, entourée de volcans du Massif Central.',
+    wikipediaUrl: W + 'Clermont-Ferrand',
+    tags: [
+      tag('randonnee', 'Parc Naturel Régional des Volcans d\'Auvergne, GR441 autour du Puy de Dôme', 'https://www.parc-volcans-auvergne.com/', 'Voir le Parc des Volcans', 100),
+      tag('nature-ecotourisme', 'Chaîne des Puys classée UNESCO, réserve biosphère', W + 'Chaîne_des_Puys', 'Voir la Chaîne des Puys', 100),
+      tag('gastronomie', 'AOC Fourme d\'Ambert, Saint-Nectaire, Cantal', 'https://www.inao.gouv.fr/', 'Voir les AOC Auvergne', 90),
+    ],
+  },
+
+  // ─── Provence-Alpes-Côte d'Azur ──────────────────────────────────────────
+  18: {
+    description: 'Marseille est la deuxième ville de France et la plus ancienne cité française, fondée il y a 2 600 ans.',
+    wikipediaUrl: W + 'Marseille',
+    tags: [
+      tag('plage-mer', 'Calanques de Marseille, côte méditerranéenne, plages des Catalans', W + 'Calanques_de_Marseille', 'Voir les calanques', 100),
+      tag('culture-histoire', 'Ville fondée en 600 av. J.-C., MuCEM, Notre-Dame de la Garde', W + 'Marseille', 'Découvrir Marseille', 100),
+      tag('gastronomie', 'Bouillabaisse, navettes, marchés du Vieux Port', W + 'Bouillabaisse', 'Voir la gastronomie marseillaise', 95),
+    ],
+  },
+  19: {
+    description: 'Nice est la cinquième ville de France, capitale de la Côte d\'Azur, réputée pour sa Promenade des Anglais.',
+    wikipediaUrl: W + 'Nice',
+    tags: [
+      tag('plage-mer', 'Promenade des Anglais, plages de la Baie des Anges, Méditerranée', W + 'Promenade_des_Anglais', 'Voir la Promenade des Anglais', 100),
+      tag('culture-histoire', 'Vieux-Nice classé, musée Matisse, musée Chagall', W + 'Vieux-Nice', 'Voir le Vieux-Nice', 95),
+      tag('gastronomie', 'Socca, pissaladière, cuisine niçoise AOC', W + 'Cuisine_niçoise', 'Voir la cuisine niçoise', 90),
+    ],
+  },
+  20: {
+    description: 'Toulon est une ville méditerranéenne et premier port militaire de France.',
+    wikipediaUrl: W + 'Toulon',
+    tags: [
+      tag('plage-mer', 'Côte méditerranéenne, plages de Mourillon, îles d\'Or à proximité', W + 'Toulon', 'Voir Toulon', 95),
+      tag('sports-nautiques', 'Voile, plongée, premier port militaire de France', W + 'Port_de_Toulon', 'Voir le port', 85),
+    ],
+  },
+  21: {
+    description: 'Aix-en-Provence est une ville provençale élégante, ville de Cézanne et du festival international d\'art lyrique.',
+    wikipediaUrl: W + 'Aix-en-Provence',
+    tags: [
+      tag('culture-histoire', 'Ville de Cézanne, cathédrale Saint-Sauveur, cours Mirabeau', W + 'Aix-en-Provence', 'Découvrir Aix-en-Provence', 95),
+      tag('gastronomie', 'Calissons d\'Aix AOC, marchés provençaux, rosés de Provence', W + 'Calisson', 'Voir la gastronomie provençale', 90),
+      tag('art-architecture', 'Atelier de Cézanne, musée Granet, architecture baroque', W + 'Paul_Cézanne', 'Voir l\'atelier de Cézanne', 90),
+    ],
+  },
+  22: {
+    description: 'Avignon est une cité médiévale classée UNESCO, connue pour son Palais des Papes et son festival.',
+    wikipediaUrl: W + 'Avignon',
+    tags: [
+      tag('culture-histoire', 'Palais des Papes classé UNESCO, pont Saint-Bénézet, remparts', W + 'Palais_des_papes_d\'Avignon', 'Voir le Palais des Papes', 100),
+      tag('gastronomie', 'Vignobles Châteauneuf-du-Pape à 20km, cuisine provençale', W + 'Châteauneuf-du-Pape', 'Voir les vignobles', 90),
+      tag('oenologie', 'AOC Châteauneuf-du-Pape, Gigondas, Vacqueyras à 20km', 'https://www.inter-rhone.com/', 'Voir les vins du Rhône', 95),
+    ],
+  },
+  23: {
+    description: 'Avignon centre, cœur de la cité des papes.',
+    wikipediaUrl: W + 'Avignon',
+    tags: [
+      tag('culture-histoire', 'Palais des Papes classé UNESCO, festival d\'Avignon', W + 'Palais_des_papes_d\'Avignon', 'Voir le Palais des Papes', 100),
+      tag('oenologie', 'AOC Châteauneuf-du-Pape, Côtes du Rhône à 20km', 'https://www.inter-rhone.com/', 'Voir les vins du Rhône', 90),
+    ],
+  },
+  24: {
+    description: 'Cannes est une ville méditerranéenne mondialement connue pour son festival du film.',
+    wikipediaUrl: W + 'Cannes',
+    tags: [
+      tag('plage-mer', 'Croisette, plages de sable fin, îles de Lérins', W + 'Cannes', 'Voir Cannes', 100),
+      tag('vie-nocturne', 'Festival de Cannes, casinos, clubs sur la Croisette', W + 'Festival_de_Cannes', 'Voir le Festival de Cannes', 90),
+    ],
+  },
+  25: {
+    description: 'Antibes est une ville fortifiée de la Côte d\'Azur avec un musée Picasso.',
+    wikipediaUrl: W + 'Antibes',
+    tags: [
+      tag('plage-mer', 'Plages de la Garoupe, Cap d\'Antibes, Méditerranée', W + 'Antibes', 'Voir Antibes', 95),
+      tag('culture-histoire', 'Musée Picasso, remparts de Vauban, vieille ville', W + 'Château_Grimaldi_(Antibes)', 'Voir le Musée Picasso', 90),
+    ],
+  },
+
+  // ─── Occitanie ────────────────────────────────────────────────────────────
+  26: {
+    description: 'Toulouse est la quatrième ville de France, capitale de l\'aéronautique et ville rose.',
+    wikipediaUrl: W + 'Toulouse',
+    tags: [
+      tag('culture-histoire', 'Basilique Saint-Sernin classée UNESCO, Capitole, Cité de l\'Espace', W + 'Toulouse', 'Découvrir Toulouse', 100),
+      tag('gastronomie', 'Cassoulet, saucisse de Toulouse, foie gras, vins de Gaillac', W + 'Cassoulet', 'Voir la gastronomie toulousaine', 90),
+    ],
+  },
+  27: {
+    description: 'Montpellier est une ville dynamique du Languedoc, proche de la mer et des vignobles.',
+    wikipediaUrl: W + 'Montpellier',
+    tags: [
+      tag('plage-mer', 'Palavas-les-Flots, La Grande-Motte à 15km, Méditerranée', W + 'Montpellier', 'Voir les plages', 90),
+      tag('culture-histoire', 'Place de la Comédie, musée Fabre, écusson médiéval', W + 'Montpellier', 'Découvrir Montpellier', 85),
+      tag('gastronomie', 'Vignobles du Languedoc, huîtres de l\'étang de Thau à 30km', W + 'Vignoble_du_Languedoc', 'Voir les vins du Languedoc', 85),
+    ],
+  },
+  28: {
+    description: 'Nîmes est une ville romaine avec des monuments exceptionnellement bien conservés.',
+    wikipediaUrl: W + 'Nîmes',
+    tags: [
+      tag('culture-histoire', 'Arènes romaines (1er siècle), Maison Carrée classée UNESCO, Ferias', W + 'Arènes_de_Nîmes', 'Voir les Arènes de Nîmes', 100),
+      tag('gastronomie', 'Brandade de Nîmes, vignobles des Costières de Nîmes AOC', W + 'Brandade_de_Nîmes', 'Voir la gastronomie', 85),
+    ],
+  },
+  29: {
+    description: 'Perpignan est la capitale de la Catalogne française, à la frontière espagnole.',
+    wikipediaUrl: W + 'Perpignan',
+    tags: [
+      tag('plage-mer', 'Canet-en-Roussillon, côte vermeille à 15km, Méditerranée', W + 'Perpignan', 'Voir les plages', 90),
+      tag('culture-histoire', 'Palais des rois de Majorque, cathédrale Saint-Jean, culture catalane', W + 'Palais_des_rois_de_Majorque', 'Voir le Palais', 90),
+      tag('gastronomie', 'Cuisine catalane, vignobles des Côtes du Roussillon AOC', W + 'Vignoble_du_Roussillon', 'Voir les vins', 85),
+    ],
+  },
+  30: {
+    description: 'Béziers est une ville languedocienne sur le Canal du Midi.',
+    wikipediaUrl: W + 'Béziers',
+    tags: [
+      tag('oenologie', 'Vignobles de Saint-Chinian, Faugères, Languedoc AOC', W + 'Vignoble_du_Languedoc', 'Voir les vins du Languedoc', 90),
+      tag('culture-histoire', 'Canal du Midi classé UNESCO à 5km, cathédrale Saint-Nazaire', W + 'Canal_du_Midi', 'Voir le Canal du Midi', 90),
+    ],
+  },
+  31: {
+    description: 'Narbonne est une ville antique sur la Via Domitia, proche des vignobles.',
+    wikipediaUrl: W + 'Narbonne',
+    tags: [
+      tag('plage-mer', 'Gruissan, Narbonne Plage à 15km, étangs méditerranéens', W + 'Narbonne', 'Voir les plages', 85),
+      tag('oenologie', 'AOC Corbières, Fitou, La Clape', W + 'Vignoble_du_Languedoc', 'Voir les vins', 90),
+      tag('culture-histoire', 'Vestiges romains, canal de la Robine classé UNESCO', W + 'Narbonne', 'Voir Narbonne', 85),
+    ],
+  },
+  32: {
+    description: 'Carcassonne est une cité médiévale fortifiée classée au patrimoine mondial de l\'UNESCO.',
+    wikipediaUrl: W + 'Carcassonne',
+    tags: [
+      tag('culture-histoire', 'Cité médiévale classée UNESCO, château comtal, remparts XIIe siècle', W + 'Carcassonne', 'Découvrir la Cité de Carcassonne', 100),
+      tag('kid-friendly', 'Cité médiévale idéale pour les familles, son et lumière', W + 'Carcassonne', 'Voir Carcassonne', 85),
+    ],
+  },
+
+  // ─── Nouvelle-Aquitaine ────────────────────────────────────────────────────
+  33: {
+    description: 'Bordeaux est une ville UNESCO réputée pour ses vins et son architecture néoclassique.',
+    wikipediaUrl: W + 'Bordeaux',
+    tags: [
+      tag('oenologie', 'Capitale mondiale du vin, 57 AOC dont Médoc, Saint-Émilion, Pomerol', W + 'Vignoble_de_Bordeaux', 'Voir les vignobles bordelais', 100),
+      tag('gastronomie', 'Canelé bordelais, lamproie, huîtres du Bassin d\'Arcachon', W + 'Canelé', 'Voir la gastronomie bordelaise', 95),
+      tag('culture-histoire', 'Port de la Lune classé UNESCO, place de la Bourse, Cité du Vin', W + 'Bordeaux', 'Découvrir Bordeaux', 100),
+    ],
+  },
+  34: {
+    description: 'La Rochelle est une ville portuaire de Charente-Maritime réputée pour son vieux port et ses tours médiévales.',
+    wikipediaUrl: W + 'La_Rochelle',
+    tags: [
+      tag('plage-mer', 'Côte atlantique, plages de Châtelaillon, île de Ré à 30km', W + 'La_Rochelle', 'Voir La Rochelle', 95),
+      tag('sports-nautiques', 'Voile, kitesurf, port de plaisance, Route du Rhum', W + 'La_Rochelle', 'Voir le port', 90),
+      tag('kid-friendly', 'Aquarium de La Rochelle, tours médiévales, vélos en ville', W + 'Aquarium_de_La_Rochelle', 'Voir l\'aquarium', 85),
+      tag('gastronomie', 'Huîtres de Marennes-Oléron AOP, moules de l\'Aiguillon', W + 'Marennes-Oléron', 'Voir les huîtres', 90),
+    ],
+  },
+  35: {
+    description: 'Poitiers est une ville médiévale du Vienne avec de nombreuses églises romanes.',
+    wikipediaUrl: W + 'Poitiers',
+    tags: [
+      tag('culture-histoire', 'Baptistère Saint-Jean (IVe siècle), Notre-Dame-la-Grande, art roman', W + 'Poitiers', 'Découvrir Poitiers', 90),
+      tag('gastronomie', 'Chèvre du Poitou AOC, macarons de Montmorillon', W + 'Poitiers', 'Voir la gastronomie', 80),
+    ],
+  },
+  36: {
+    description: 'Limoges est la capitale mondiale de la porcelaine et de l\'émail.',
+    wikipediaUrl: W + 'Limoges',
+    tags: [
+      tag('culture-histoire', 'Porcelaine de Limoges, cathédrale Saint-Étienne, musée de l\'Émail', W + 'Porcelaine_de_Limoges', 'Voir la porcelaine', 90),
+      tag('gastronomie', 'Bœuf limousin AOC, clafoutis aux cerises', W + 'Limoges', 'Voir la gastronomie', 80),
+    ],
+  },
+  37: {
+    description: 'Angoulême est la capitale mondiale de la bande dessinée.',
+    wikipediaUrl: W + 'Angoulême',
+    tags: [
+      tag('culture-histoire', 'Festival international de la BD, cathédrale Saint-Pierre', W + 'Festival_international_de_la_bande_dessinée_d\'Angoulême', 'Voir le festival BD', 90),
+      tag('gastronomie', 'Cognac AOC à 30km, marguerites d\'Angoulême', W + 'Cognac_(eau-de-vie)', 'Voir le cognac', 85),
+    ],
+  },
+  38: {
+    description: 'Pau est une ville de piémont pyrénéen avec un boulevard des Pyrénées remarquable.',
+    wikipediaUrl: W + 'Pau',
+    tags: [
+      tag('montagne', 'Porte des Pyrénées, vue panoramique sur la chaîne, Pic du Midi à 50km', W + 'Pau', 'Voir Pau', 90),
+      tag('randonnee', 'Chemin de Saint-Jacques GR65, Parc National des Pyrénées à 40km', W + 'Chemin_de_Saint-Jacques-de-Compostelle_(via_Turonensis)', 'Voir le GR65', 90),
+      tag('gastronomie', 'Garbure béarnaise, jurançon AOC', W + 'Jurançon_(AOC)', 'Voir les vins de Jurançon', 85),
+    ],
+  },
+  39: {
+    description: 'Bayonne est une ville basque réputée pour son jambon et son chocolat.',
+    wikipediaUrl: W + 'Bayonne',
+    tags: [
+      tag('plage-mer', 'Côte basque, Biarritz à 8km, Anglet', W + 'Bayonne', 'Voir Bayonne', 90),
+      tag('sports-nautiques', 'Surf, kayak sur la Nive et l\'Adour', W + 'Bayonne', 'Voir les sports', 85),
+      tag('gastronomie', 'Jambon de Bayonne IGP, chocolat basque, fêtes de Bayonne', W + 'Jambon_de_Bayonne', 'Voir le jambon de Bayonne', 100),
+    ],
+  },
+  40: {
+    description: 'Biarritz est une station balnéaire du Pays Basque mondialement connue pour le surf.',
+    wikipediaUrl: W + 'Biarritz',
+    tags: [
+      tag('plage-mer', 'Grande Plage, plage de la Côte des Basques, Atlantique', W + 'Biarritz', 'Voir les plages de Biarritz', 100),
+      tag('sports-nautiques', 'Capitale européenne du surf, compétitions internationales', W + 'Biarritz', 'Voir le surf à Biarritz', 100),
+    ],
+  },
+
+  // ─── Pays de la Loire ────────────────────────────────────────────────────
+  41: {
+    description: 'Nantes est la sixième ville de France, ancienne capitale de Bretagne.',
+    wikipediaUrl: W + 'Nantes',
+    tags: [
+      tag('culture-histoire', 'Château des Ducs de Bretagne, cathédrale, machines de l\'île', W + 'Château_des_ducs_de_Bretagne', 'Voir le château', 95),
+      tag('gastronomie', 'Muscadet AOC, beurre blanc nantais, galettes', W + 'Muscadet', 'Voir le muscadet', 85),
+    ],
+  },
+  42: {
+    description: 'Angers est la préfecture du Maine-et-Loire, connue pour son château médiéval et ses vignobles.',
+    wikipediaUrl: W + 'Angers',
+    tags: [
+      tag('culture-histoire', 'Château d\'Angers (tapisserie de l\'Apocalypse), cathédrale Saint-Maurice', W + 'Château_d\'Angers', 'Voir le Château d\'Angers', 95),
+      tag('oenologie', 'AOC Anjou, Coteaux du Layon, Savennières', 'https://www.vinsvaldeloire.fr/', 'Voir les vins d\'Anjou', 90),
+    ],
+  },
+  43: {
+    description: 'Le Mans est connue pour ses 24 Heures du Mans et sa vieille ville médiévale.',
+    wikipediaUrl: W + 'Le_Mans',
+    tags: [
+      tag('culture-histoire', 'Cité Plantagenêt, cathédrale Saint-Julien, 24 Heures du Mans', W + 'Le_Mans', 'Voir Le Mans', 85),
+      tag('gastronomie', 'Rillettes du Mans IGP', W + 'Rillettes', 'Voir les rillettes du Mans', 80),
+    ],
+  },
+  44: {
+    description: 'Saint-Nazaire est une ville portuaire à l\'embouchure de la Loire.',
+    wikipediaUrl: W + 'Saint-Nazaire',
+    tags: [
+      tag('plage-mer', 'Côte atlantique, plage de Saint-Marc, embouchure de la Loire', W + 'Saint-Nazaire', 'Voir Saint-Nazaire', 80),
+      tag('culture-histoire', 'Base de sous-marins (mémorial), chantiers navals, Escal\'Atlantic', W + 'Saint-Nazaire', 'Voir Saint-Nazaire', 75),
+    ],
+  },
+  45: {
+    description: 'Laval est la préfecture de la Mayenne en Pays de la Loire.',
+    wikipediaUrl: W + 'Laval_(Mayenne)',
+    tags: [
+      tag('culture-histoire', 'Vieux château médiéval, musée d\'Art Naïf Henri Rousseau', W + 'Laval_(Mayenne)', 'Voir Laval', 75),
+      tag('gastronomie', 'Andouille de Vire, produits laitiers mayennais', W + 'Laval_(Mayenne)', 'Voir Laval', 70),
+    ],
+  },
+
+  // ─── Bretagne ─────────────────────────────────────────────────────────────
+  46: {
+    description: 'Rennes est la capitale de la Bretagne, ville universitaire dynamique.',
+    wikipediaUrl: W + 'Rennes',
+    tags: [
+      tag('culture-histoire', 'Centre médiéval, parlement de Bretagne, musée de Bretagne', W + 'Rennes', 'Découvrir Rennes', 90),
+      tag('gastronomie', 'Galettes bretonnes, cidre IGP, marché des Lices', W + 'Crêpe_bretonne', 'Voir la gastronomie bretonne', 90),
+    ],
+  },
+  47: {
+    description: 'Brest est une ville bretonne en pointe finistèrienne.',
+    wikipediaUrl: W + 'Brest',
+    tags: [
+      tag('plage-mer', 'Presqu\'île de Crozon à 30km, Finistère, côte atlantique', W + 'Brest', 'Voir Brest', 90),
+      tag('sports-nautiques', 'Voile, rade de Brest, Océanopolis, plongée', W + 'Océanopolis', 'Voir Océanopolis', 85),
+      tag('gastronomie', 'Homard breton, huîtres de la rade, galettes finistériennes', W + 'Brest', 'Voir la gastronomie', 80),
+    ],
+  },
+  48: {
+    description: 'Quimper est la préfecture du Finistère, connue pour sa cathédrale et ses faïences.',
+    wikipediaUrl: W + 'Quimper',
+    tags: [
+      tag('plage-mer', 'Bénodet à 20km, côte du Finistère, Cornouaille maritime', W + 'Quimper', 'Voir les plages', 85),
+      tag('culture-histoire', 'Cathédrale Saint-Corentin, musée des Beaux-Arts, festival', W + 'Quimper', 'Découvrir Quimper', 90),
+      tag('gastronomie', 'Galettes de Pont-Aven, cidre breton, homard', W + 'Galette_bretonne', 'Voir la gastronomie', 85),
+    ],
+  },
+  49: {
+    description: 'Saint-Brieuc est la préfecture des Côtes-d\'Armor, porte des côtes bretonnes.',
+    wikipediaUrl: W + 'Saint-Brieuc',
+    tags: [
+      tag('plage-mer', 'Baie de Saint-Brieuc, Côtes-d\'Armor, côte atlantique', W + 'Saint-Brieuc', 'Voir Saint-Brieuc', 85),
+      tag('randonnee', 'GR34 (sentier des douaniers côtiers)', W + 'GR34', 'Voir le GR34', 90),
+    ],
+  },
+  50: {
+    description: 'Lorient est une ville bretonne connue pour son festival interceltique.',
+    wikipediaUrl: W + 'Lorient',
+    tags: [
+      tag('plage-mer', 'Côte atlantique, presqu\'île de Quiberon à 40km', W + 'Lorient', 'Voir Lorient', 85),
+      tag('sports-nautiques', 'Voile, Vendée Globe, port de plaisance', W + 'Lorient', 'Voir le port', 85),
+      tag('gastronomie', 'Huîtres de Bretagne, homard, festival interceltique', W + 'Festival_interceltique_de_Lorient', 'Voir le Festival interceltique', 80),
+    ],
+  },
+  51: {
+    description: 'Vannes est une ville médiévale bretonne aux portes du golfe du Morbihan.',
+    wikipediaUrl: W + 'Vannes',
+    tags: [
+      tag('plage-mer', 'Golfe du Morbihan, archipel de 40 îles, Belle-Île à 45km', W + 'Golfe_du_Morbihan', 'Voir le Golfe du Morbihan', 95),
+      tag('culture-histoire', 'Remparts médiévaux, cathédrale Saint-Pierre, vieille ville', W + 'Vannes', 'Découvrir Vannes', 90),
+      tag('gastronomie', 'Huîtres du Morbihan, homard breton, galettes', W + 'Vannes', 'Voir la gastronomie', 85),
+    ],
+  },
+
+  // ─── Centre-Val de Loire ──────────────────────────────────────────────────
+  52: {
+    description: 'Tours est la capitale de la Touraine, au cœur du Val de Loire classé UNESCO.',
+    wikipediaUrl: W + 'Tours',
+    tags: [
+      tag('culture-histoire', 'Val de Loire classé UNESCO, cathédrale Saint-Gatien, vieille ville', W + 'Tours', 'Découvrir Tours', 95),
+      tag('gastronomie', 'Rillettes de Tours IGP, vouvray', W + 'Vouvray_(AOC)', 'Voir les vins de Touraine', 90),
+      tag('oenologie', 'AOC Vouvray, Montlouis, Chinon, Bourgueil', 'https://www.vinsvaldeloire.fr/', 'Voir les vins du Val de Loire', 95),
+    ],
+  },
+  53: {
+    description: 'Orléans est la ville de Jeanne d\'Arc, au bord de la Loire.',
+    wikipediaUrl: W + 'Orléans',
+    tags: [
+      tag('culture-histoire', 'Ville de Jeanne d\'Arc, cathédrale Sainte-Croix, musée des Beaux-Arts', W + 'Orléans', 'Découvrir Orléans', 90),
+      tag('gastronomie', 'Vinaigre d\'Orléans, pithiviers, gibier de Sologne', W + 'Orléans', 'Voir la gastronomie', 80),
+    ],
+  },
+  54: {
+    description: 'Blois est une ville royale du Val de Loire avec un château des rois de France.',
+    wikipediaUrl: W + 'Blois',
+    tags: [
+      tag('culture-histoire', 'Château royal de Blois, Val de Loire classé UNESCO', W + 'Château_de_Blois', 'Voir le Château de Blois', 95),
+      tag('oenologie', 'AOC Cheverny, Valençay, vignobles du Val de Loire', 'https://www.vinsvaldeloire.fr/', 'Voir les vins', 85),
+    ],
+  },
+  55: {
+    description: 'Bourges est une ville médiévale du Cher avec une cathédrale gothique classée UNESCO.',
+    wikipediaUrl: W + 'Bourges',
+    tags: [
+      tag('culture-histoire', 'Cathédrale Saint-Étienne classée UNESCO, Palais Jacques Cœur', W + 'Cathédrale_Saint-Étienne_de_Bourges', 'Voir la cathédrale de Bourges', 100),
+      tag('gastronomie', 'Fromages du Berry, foire aux vins', W + 'Bourges', 'Voir Bourges', 75),
+    ],
+  },
+  56: {
+    description: 'Châteauroux est la préfecture de l\'Indre en région Centre.',
+    wikipediaUrl: W + 'Châteauroux',
+    tags: [
+      tag('nature-ecotourisme', 'Brenne — Parc Naturel Régional à 40km, étangs et oiseaux', 'https://www.parc-naturel-brenne.fr/', 'Voir le Parc de la Brenne', 85),
+      tag('culture-histoire', 'Château Raoul, musée de l\'Indre', W + 'Châteauroux', 'Voir Châteauroux', 70),
+    ],
+  },
+
+  // ─── Grand Est ────────────────────────────────────────────────────────────
+  57: {
+    description: 'Strasbourg est la capitale de l\'Alsace et siège du Parlement européen, avec une vieille ville classée UNESCO.',
+    wikipediaUrl: W + 'Strasbourg',
+    tags: [
+      tag('culture-histoire', 'Grande Île classée UNESCO, cathédrale Notre-Dame, Parlement européen', W + 'Strasbourg', 'Découvrir Strasbourg', 100),
+      tag('gastronomie', 'Choucroute alsacienne, baeckeoffe, tarte flambée', W + 'Gastronomie_alsacienne', 'Voir la gastronomie alsacienne', 95),
+      tag('oenologie', 'Route des vins d\'Alsace, Riesling, Gewurztraminer AOC', 'https://www.vinsalsace.com/', 'Voir les vins d\'Alsace', 95),
+      tag('shopping', 'Marché de Noël (plus ancien de France), Petite France', W + 'Marché_de_Noël_de_Strasbourg', 'Voir le marché de Noël', 90),
+    ],
+  },
+  58: {
+    description: 'Metz est une ville lorraine avec une cathédrale gothique aux vitraux de Chagall.',
+    wikipediaUrl: W + 'Metz',
+    tags: [
+      tag('culture-histoire', 'Cathédrale Saint-Étienne (lanterne de Dieu), Centre Pompidou-Metz', W + 'Cathédrale_Saint-Étienne_de_Metz', 'Voir la cathédrale de Metz', 95),
+      tag('gastronomie', 'Quiche lorraine, mirabelle de Lorraine IGP', W + 'Quiche_lorraine', 'Voir la gastronomie lorraine', 85),
+    ],
+  },
+  59: {
+    description: 'Reims est la ville du sacre des rois de France et de la champagne.',
+    wikipediaUrl: W + 'Reims',
+    tags: [
+      tag('culture-histoire', 'Cathédrale Notre-Dame classée UNESCO, sacre des rois de France', W + 'Cathédrale_Notre-Dame_de_Reims', 'Voir la cathédrale de Reims', 100),
+      tag('oenologie', 'Champagne AOC, caves de Reims, Moët & Chandon, Veuve Clicquot', W + 'Champagne_(AOC)', 'Voir les caves de champagne', 100),
+      tag('gastronomie', 'Biscuit rose de Reims, jambon de Reims, champagne', W + 'Biscuit_rose_de_Reims', 'Voir la gastronomie rémoise', 90),
+    ],
+  },
+  60: {
+    description: 'Nancy est la capitale de la Lorraine avec la place Stanislas classée UNESCO.',
+    wikipediaUrl: W + 'Nancy',
+    tags: [
+      tag('culture-histoire', 'Place Stanislas classée UNESCO, École de Nancy (Art Nouveau)', W + 'Place_Stanislas', 'Voir la Place Stanislas', 100),
+      tag('art-architecture', 'Art Nouveau de l\'École de Nancy, musée des Beaux-Arts', W + 'École_de_Nancy', 'Voir l\'Art Nouveau de Nancy', 95),
+      tag('gastronomie', 'Macarons de Nancy, bergamotes, quiche lorraine', W + 'Macaron_de_Nancy', 'Voir la gastronomie de Nancy', 85),
+    ],
+  },
+  61: {
+    description: 'Mulhouse est une ville alsacienne avec des musées techniques d\'exception.',
+    wikipediaUrl: W + 'Mulhouse',
+    tags: [
+      tag('culture-histoire', 'Cité du Train (plus grand musée ferroviaire d\'Europe), Cité de l\'Automobile', W + 'Cité_du_Train', 'Voir la Cité du Train', 90),
+    ],
+  },
+  62: {
+    description: 'Colmar est une ville alsacienne pittoresque avec ses maisons à colombages et sa Petite Venise.',
+    wikipediaUrl: W + 'Colmar',
+    tags: [
+      tag('oenologie', 'Route des vins d\'Alsace à 5km, Gewurztraminer, Riesling', 'https://www.vinsalsace.com/', 'Voir la route des vins', 100),
+      tag('gastronomie', 'Tarte flambée, choucroute, baeckeoffe, restaurants étoilés', W + 'Gastronomie_alsacienne', 'Voir la gastronomie alsacienne', 90),
+      tag('culture-histoire', 'Petite Venise, maisons à colombages, musée Unterlinden', W + 'Colmar', 'Découvrir Colmar', 95),
+    ],
+  },
+  63: {
+    description: 'Épernay est la capitale mondiale du champagne avec son Avenue de Champagne.',
+    wikipediaUrl: W + 'Épernay',
+    tags: [
+      tag('oenologie', 'Avenue de Champagne, Moët & Chandon, Pol Roger, caves champagne', W + 'Épernay', 'Voir l\'Avenue de Champagne', 100),
+      tag('gastronomie', 'Champagne AOC, gastronomie champenoise', W + 'Champagne_(AOC)', 'Voir les caves de champagne', 100),
+    ],
+  },
+  64: {
+    description: 'Troyes est une ville médiévale champenoise avec un centre historique exceptionnel.',
+    wikipediaUrl: W + 'Troyes',
+    tags: [
+      tag('culture-histoire', 'Centre médiéval exceptionnel, 7 églises gothiques, maisons à pans de bois', W + 'Troyes', 'Découvrir Troyes', 95),
+      tag('gastronomie', 'Andouillette de Troyes, chaource AOC', W + 'Andouillette', 'Voir la gastronomie troyenne', 85),
+    ],
+  },
+  65: {
+    description: 'Charleville-Mézières est la préfecture des Ardennes, patrie de Rimbaud.',
+    wikipediaUrl: W + 'Charleville-Mézières',
+    tags: [
+      tag('nature-ecotourisme', 'Forêt des Ardennes, vallée de la Meuse, randonnées en forêt', W + 'Ardennes_(département)', 'Voir les Ardennes', 85),
+      tag('randonnee', 'Sentiers de la Meuse, forêts ardennaises, GR12', W + 'Charleville-Mézières', 'Voir Charleville-Mézières', 80),
+    ],
+  },
+
+  // ─── Hauts-de-France ──────────────────────────────────────────────────────
+  66: {
+    description: 'Lille est la capitale des Hauts-de-France, métropole dynamique avec un remarquable centre historique flamand.',
+    wikipediaUrl: W + 'Lille',
+    tags: [
+      tag('culture-histoire', 'Vieux-Lille flamand, musée des Beaux-Arts, citadelle Vauban', W + 'Lille', 'Découvrir Lille', 95),
+      tag('gastronomie', 'Carbonnade flamande, moules-frites, maroilles, bières du Nord', W + 'Carbonnade_flamande', 'Voir la gastronomie du Nord', 90),
+      tag('shopping', 'Wazemmes, Euralille, braderie de Lille', W + 'Braderie_de_Lille', 'Voir la Braderie de Lille', 85),
+    ],
+  },
+  67: {
+    description: 'Lille Europe, gare internationale au cœur de la métropole lilloise.',
+    wikipediaUrl: W + 'Lille',
+    tags: [
+      tag('culture-histoire', 'Vieux-Lille, musée des Beaux-Arts, citadelle Vauban', W + 'Lille', 'Découvrir Lille', 95),
+      tag('gastronomie', 'Carbonnade flamande, moules, maroilles', W + 'Carbonnade_flamande', 'Voir la gastronomie', 90),
+    ],
+  },
+  68: {
+    description: 'Amiens est la préfecture de la Somme avec la plus grande cathédrale gothique de France.',
+    wikipediaUrl: W + 'Amiens',
+    tags: [
+      tag('culture-histoire', 'Cathédrale Notre-Dame classée UNESCO, hortillonnages, Jules Verne', W + 'Cathédrale_Notre-Dame_d\'Amiens', 'Voir la cathédrale d\'Amiens', 100),
+      tag('gastronomie', 'Macarons d\'Amiens, ficelle picarde, pâté de canard', W + 'Amiens', 'Voir la gastronomie picarde', 80),
+    ],
+  },
+  69: {
+    description: 'Arras est une ville du Pas-de-Calais avec des places flamandes remarquables.',
+    wikipediaUrl: W + 'Arras',
+    tags: [
+      tag('culture-histoire', 'Places flamandes, beffroi classé UNESCO, mémoriaux 14-18', W + 'Arras', 'Découvrir Arras', 90),
+    ],
+  },
+  70: {
+    description: 'Calais est un port de la Manche et ville de la dentelle.',
+    wikipediaUrl: W + 'Calais',
+    tags: [
+      tag('plage-mer', 'Côte d\'Opale, Cap Blanc-Nez à 15km, Manche', W + 'Calais', 'Voir Calais', 85),
+      tag('shopping', 'Cité de la Dentelle et de la Mode', W + 'Dentelle_de_Calais', 'Voir la dentelle de Calais', 80),
+    ],
+  },
+  71: {
+    description: 'Dunkerque est une ville portuaire du Nord réputée pour son carnaval.',
+    wikipediaUrl: W + 'Dunkerque',
+    tags: [
+      tag('plage-mer', 'Côte d\'Opale, plage de Malo-les-Bains, mer du Nord', W + 'Dunkerque', 'Voir Dunkerque', 80),
+    ],
+  },
+  72: {
+    description: 'Valenciennes est une ville du Nord avec un musée des Beaux-Arts remarquable.',
+    wikipediaUrl: W + 'Valenciennes',
+    tags: [
+      tag('culture-histoire', 'Musée des Beaux-Arts (Rubens, Watteau), beffroi', W + 'Valenciennes', 'Voir Valenciennes', 80),
+    ],
+  },
+  73: {
+    description: 'Douai est une ville flamande du Nord avec un célèbre beffroi.',
+    wikipediaUrl: W + 'Douai',
+    tags: [
+      tag('culture-histoire', 'Beffroi classé UNESCO, musée de la Chartreuse', W + 'Douai', 'Voir Douai', 80),
+    ],
+  },
+  74: {
+    description: 'Tourcoing est une ville de la métropole lilloise.',
+    wikipediaUrl: W + 'Tourcoing',
+    tags: [
+      tag('shopping', 'Métropole lilloise, galeries commerciales, braderies', W + 'Tourcoing', 'Voir Tourcoing', 70),
+      tag('gastronomie', 'Cuisine flamande, spécialités du Nord', W + 'Tourcoing', 'Voir Tourcoing', 65),
+    ],
+  },
+  75: {
+    description: 'Roubaix est une ville textile reconvertie en cité du design.',
+    wikipediaUrl: W + 'Roubaix',
+    tags: [
+      tag('shopping', 'La Condition Publique, McArthurGlen, ville du textile', W + 'Roubaix', 'Voir Roubaix', 75),
+      tag('gastronomie', 'Cuisine flamande, bières artisanales du Nord', W + 'Roubaix', 'Voir Roubaix', 65),
+    ],
+  },
+
+  // ─── Normandie ────────────────────────────────────────────────────────────
+  76: {
+    description: 'Rouen est la capitale de la Normandie, ville de Jeanne d\'Arc et de la cathédrale peinte par Monet.',
+    wikipediaUrl: W + 'Rouen',
+    tags: [
+      tag('culture-histoire', 'Cathédrale Notre-Dame (peinte par Monet), Gros-Horloge, Vieux-Rouen', W + 'Cathédrale_Notre-Dame_de_Rouen', 'Voir la cathédrale de Rouen', 95),
+      tag('gastronomie', 'Canard à la rouennaise, camembert, calvados AOC', W + 'Rouen', 'Voir la gastronomie normande', 85),
+      tag('art-architecture', 'Impressionnisme (Monet), musée des Beaux-Arts', W + 'Claude_Monet', 'Voir l\'héritage impressionniste', 90),
+    ],
+  },
+  77: {
+    description: 'Le Havre est une ville portuaire normande classée UNESCO.',
+    wikipediaUrl: W + 'Le_Havre',
+    tags: [
+      tag('plage-mer', 'Côte Normande, plage du Havre, Étretat à 30km', W + 'Le_Havre', 'Voir Le Havre', 90),
+      tag('culture-histoire', 'Centre-ville classé UNESCO reconstruit par Auguste Perret', W + 'Le_Havre', 'Voir Le Havre', 90),
+      tag('sports-nautiques', 'Port, voile, club nautique du Havre', W + 'Le_Havre', 'Voir le port', 80),
+    ],
+  },
+  78: {
+    description: 'Caen est la capitale de la Normandie et ville mémorial du Débarquement.',
+    wikipediaUrl: W + 'Caen',
+    tags: [
+      tag('culture-histoire', 'Mémorial de Caen, château de Guillaume le Conquérant', W + 'Mémorial_de_Caen', 'Voir le Mémorial de Caen', 95),
+      tag('gastronomie', 'Trippes à la mode de Caen, calvados AOC, camembert de Normandie', W + 'Calvados_(eau-de-vie)', 'Voir les produits normands', 90),
+      tag('kid-friendly', 'Mémorial de Caen, Festyland, plages du Débarquement à 20km', W + 'Caen', 'Voir Caen', 80),
+    ],
+  },
+  79: {
+    description: 'Cherbourg est un port normand de la Manche.',
+    wikipediaUrl: W + 'Cherbourg-en-Cotentin',
+    tags: [
+      tag('plage-mer', 'Presqu\'île du Cotentin, côte normande', W + 'Cherbourg-en-Cotentin', 'Voir Cherbourg', 85),
+      tag('culture-histoire', 'Cité de la Mer (transatlantiques), fort du Roule', W + 'Cité_de_la_Mer', 'Voir la Cité de la Mer', 85),
+    ],
+  },
+  80: {
+    description: 'Dieppe est une station balnéaire normande avec le plus vieux casino de France.',
+    wikipediaUrl: W + 'Dieppe',
+    tags: [
+      tag('plage-mer', 'Côte d\'Albâtre, falaises, plage de galets normande', W + 'Dieppe', 'Voir Dieppe', 90),
+      tag('gastronomie', 'Sole dieppoise, coquilles Saint-Jacques', W + 'Dieppe', 'Voir la gastronomie', 80),
+    ],
+  },
+  81: {
+    description: 'Évreux est la préfecture de l\'Eure en Normandie.',
+    wikipediaUrl: W + 'Évreux',
+    tags: [
+      tag('culture-histoire', 'Cathédrale Notre-Dame, musée d\'Évreux, vieille ville', W + 'Évreux', 'Voir Évreux', 75),
+      tag('gastronomie', 'Produits normands, cidre, camembert', W + 'Évreux', 'Voir Évreux', 70),
+    ],
+  },
+
+  // ─── Bourgogne-Franche-Comté ──────────────────────────────────────────────
+  82: {
+    description: 'Dijon est la capitale de la Bourgogne, ville de la moutarde et des grands vins.',
+    wikipediaUrl: W + 'Dijon',
+    tags: [
+      tag('oenologie', 'Route des Grands Crus de Bourgogne, Gevrey-Chambertin, Pommard AOC', W + 'Vignoble_de_Bourgogne', 'Voir les vignobles de Bourgogne', 100),
+      tag('gastronomie', 'Moutarde de Dijon, pain d\'épices, escargots de Bourgogne', W + 'Moutarde_de_Dijon', 'Voir la gastronomie dijonnaise', 95),
+      tag('culture-histoire', 'Palais des Ducs, musée des Beaux-Arts, vieille ville', W + 'Dijon', 'Découvrir Dijon', 90),
+    ],
+  },
+  83: {
+    description: 'Besançon est la capitale de la Franche-Comté avec une citadelle classée UNESCO.',
+    wikipediaUrl: W + 'Besançon',
+    tags: [
+      tag('culture-histoire', 'Citadelle de Vauban classée UNESCO, horloge astronomique', W + 'Citadelle_de_Besançon', 'Voir la Citadelle', 95),
+      tag('lacs-rivieres', 'Boucles du Doubs, gorges du Doubs à 30km', W + 'Doubs_(rivière)', 'Voir les gorges du Doubs', 85),
+    ],
+  },
+  84: {
+    description: 'Belfort est une ville fortifiée proche des Vosges et du Jura.',
+    wikipediaUrl: W + 'Belfort',
+    tags: [
+      tag('montagne', 'Proche des Vosges du Sud et du Jura suisse', W + 'Belfort', 'Voir Belfort', 80),
+      tag('culture-histoire', 'Lion de Belfort, citadelle de Vauban', W + 'Lion_de_Belfort', 'Voir le Lion de Belfort', 85),
+    ],
+  },
+  85: {
+    description: 'Mâcon est une ville bourguignonne sur la Saône, porte du Mâconnais viticole.',
+    wikipediaUrl: W + 'Mâcon',
+    tags: [
+      tag('oenologie', 'AOC Mâcon, Pouilly-Fuissé, Saint-Véran, vignobles du Mâconnais', W + 'Vignoble_du_Mâconnais', 'Voir les vins du Mâconnais', 95),
+      tag('gastronomie', 'Bœuf charolais, poulet de Bresse AOC', W + 'Mâcon', 'Voir la gastronomie', 85),
+    ],
+  },
+  86: {
+    description: 'Auxerre est une ville de Bourgogne sur l\'Yonne.',
+    wikipediaUrl: W + 'Auxerre',
+    tags: [
+      tag('oenologie', 'Chablis AOC à 20km, vignobles de l\'Yonne', W + 'Chablis_(AOC)', 'Voir les vins de Chablis', 90),
+      tag('culture-histoire', 'Cathédrale Saint-Étienne, abbaye Saint-Germain', W + 'Auxerre', 'Voir Auxerre', 80),
+    ],
+  },
+  87: {
+    description: 'Nevers est la préfecture de la Nièvre, connue pour sa faïence.',
+    wikipediaUrl: W + 'Nevers',
+    tags: [
+      tag('culture-histoire', 'Faïence de Nevers, cathédrale, circuit de Nevers Magny-Cours', W + 'Nevers', 'Voir Nevers', 80),
+    ],
+  },
+  88: {
+    description: 'Chalon-sur-Saône est une ville viticole bourguignonne, berceau de la photographie.',
+    wikipediaUrl: W + 'Chalon-sur-Saône',
+    tags: [
+      tag('oenologie', 'Côte Chalonnaise, AOC Mercurey, Givry, Rully', W + 'Côte_chalonnaise', 'Voir les vins chalonnais', 90),
+      tag('culture-histoire', 'Musée Nicéphore Niépce (invention de la photographie)', W + 'Nicéphore_Niépce', 'Voir le Musée Niépce', 85),
+    ],
+  },
+
+  // ─── Corse ────────────────────────────────────────────────────────────────
+  89: {
+    description: 'Ajaccio est la capitale de la Corse-du-Sud, ville natale de Napoléon Bonaparte.',
+    wikipediaUrl: W + 'Ajaccio',
+    tags: [
+      tag('plage-mer', 'Golfe d\'Ajaccio, plages de sable fin, Méditerranée', W + 'Ajaccio', 'Voir les plages', 100),
+      tag('randonnee', 'GR20 (plus belle randonnée d\'Europe), Parc Naturel Régional de Corse', W + 'GR20', 'Voir le GR20', 100),
+      tag('gastronomie', 'Charcuterie corse AOP, brocciu, vins de Corse', W + 'Gastronomie_corse', 'Voir la gastronomie corse', 95),
+      tag('nature-ecotourisme', 'Parc Naturel Régional de Corse, réserves naturelles', 'https://www.parc-naturel-corse.com/', 'Voir le Parc de Corse', 100),
+    ],
+  },
+  90: {
+    description: 'Bastia est la principale ville de Haute-Corse.',
+    wikipediaUrl: W + 'Bastia',
+    tags: [
+      tag('plage-mer', 'Cap Corse à proximité, côte méditerranéenne', W + 'Bastia', 'Voir les plages', 95),
+      tag('randonnee', 'GR20, tour du Cap Corse', W + 'GR20', 'Voir le GR20', 95),
+      tag('gastronomie', 'Charcuterie corse AOP, vins du Cap Corse, brocciu', W + 'Gastronomie_corse', 'Voir la gastronomie corse', 90),
+    ],
+  },
+  91: {
+    description: 'Calvi est une ville fortifiée de Haute-Corse sur la Méditerranée.',
+    wikipediaUrl: W + 'Calvi_(Haute-Corse)',
+    tags: [
+      tag('plage-mer', 'Plage de Calvi (6km de sable blanc), golfe de Calvi', W + 'Calvi_(Haute-Corse)', 'Voir Calvi', 100),
+      tag('sports-nautiques', 'Plongée, voile, sports nautiques, baie de Calvi', W + 'Calvi_(Haute-Corse)', 'Voir les sports', 85),
+      tag('nature-ecotourisme', 'Réserve Naturelle de Scandola classée UNESCO à 40km', W + 'Réserve_naturelle_de_Scandola', 'Voir la Réserve de Scandola', 95),
+    ],
+  },
+  92: {
+    description: 'Corte est la ville de l\'intérieur de la Corse, au cœur du Parc Naturel Régional.',
+    wikipediaUrl: W + 'Corte',
+    tags: [
+      tag('randonnee', 'GR20 passe par Corte, gorges de la Restonica, mont Rotondo', W + 'GR20', 'Voir le GR20', 100),
+      tag('nature-ecotourisme', 'Parc Naturel Régional de Corse, gorges spectaculaires', 'https://www.parc-naturel-corse.com/', 'Voir le Parc de Corse', 100),
+      tag('montagne', 'Massif central corse, Monte Cinto (2 706m)', W + 'Corte', 'Voir Corte', 90),
+    ],
+  },
 };
 
-/**
- * Retourne les labels d'une station par son ID
- */
+// ─── Fonctions d'accès ────────────────────────────────────────────────────
+
+export function getStationData(stationId: number): StationData | null {
+  return stationLabels[stationId] || null;
+}
+
 export function getStationLabels(stationId: number): CityLabel[] {
-  return stationLabels[stationId] || [];
+  return stationLabels[stationId]?.tags.map(t => t.label) || [];
 }
 
-/**
- * Filtre les stations par labels sélectionnés
- */
-export function filterStationsByLabels(stationIds: (number | string)[], selectedLabels: CityLabel[]): (number | string)[] {
-  if (selectedLabels.length === 0) {
-    return stationIds;
-  }
+export function getStationTags(stationId: number): import('../types').TagEvidence[] {
+  return stationLabels[stationId]?.tags || [];
+}
 
-  return stationIds.filter(stationId => {
-    const numericId = typeof stationId === 'number' ? stationId : parseInt(stationId);
-    const labels = getStationLabels(numericId);
-    return selectedLabels.some(selectedLabel => labels.includes(selectedLabel));
+export function filterStationsByLabels(
+  stationIds: (number | string)[],
+  labels: CityLabel[],
+  mode: 'OR' | 'AND' = 'OR'
+): (number | string)[] {
+  if (labels.length === 0) return stationIds;
+  return stationIds.filter(id => {
+    const numId = typeof id === 'number' ? id : parseInt(String(id));
+    const stationLabelValues = getStationLabels(numId);
+    if (mode === 'AND') return labels.every(l => stationLabelValues.includes(l));
+    return labels.some(l => stationLabelValues.includes(l));
   });
 }
 
-/**
- * Compte le nombre de correspondances de labels pour une station
- */
-export function countLabelMatches(stationId: number | string, selectedLabels: CityLabel[]): number {
-  if (selectedLabels.length === 0) return 0;
-
-  const numericId = typeof stationId === 'number' ? stationId : parseInt(stationId);
-  const labels = getStationLabels(numericId);
-  return selectedLabels.filter(selectedLabel => labels.includes(selectedLabel)).length;
-}
-
-/**
- * Retourne les statistiques des labels
- */
-export function getLabelStats(): Record<CityLabel, number> {
-  const stats: Partial<Record<CityLabel, number>> = {};
-
-  Object.values(stationLabels).forEach(labels => {
-    labels.forEach(label => {
-      stats[label] = (stats[label] || 0) + 1;
-    });
-  });
-
-  return stats as Record<CityLabel, number>;
-}
-
-/**
- * Retourne toutes les stations ayant un label spécifique
- */
-export function getStationsByLabel(label: CityLabel): number[] {
-  return Object.entries(stationLabels)
-    .filter(([_, labels]) => labels.includes(label))
-    .map(([stationId, _]) => parseInt(stationId));
+export function countLabelMatches(stationId: number | string, labels: CityLabel[]): number {
+  const numId = typeof stationId === 'number' ? stationId : parseInt(String(stationId));
+  return getStationLabels(numId).filter(l => labels.includes(l)).length;
 }

@@ -1,157 +1,113 @@
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  Modal,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Pressable,
+  View, Text, Modal, TouchableOpacity, StyleSheet, ScrollView, Pressable,
 } from 'react-native';
-import { CityLabel, CITY_LABELS } from '../types';
+import { CityLabel, CITY_LABELS, UI_LABELS } from '../types';
 
 interface LabelSelectionModalProps {
   visible: boolean;
   selectedLabels: CityLabel[];
-  onClose: (selectedLabels: CityLabel[]) => void;
+  labelFilterMode: 'OR' | 'AND';
+  onClose: (selectedLabels: CityLabel[], mode: 'OR' | 'AND') => void;
 }
 
 export default function LabelSelectionModal({
   visible,
   selectedLabels,
+  labelFilterMode,
   onClose,
 }: LabelSelectionModalProps) {
-  const [tempSelectedLabels, setTempSelectedLabels] = useState<CityLabel[]>(selectedLabels);
+  const [tempSelected, setTempSelected] = useState<CityLabel[]>(selectedLabels);
+  const [tempMode, setTempMode] = useState<'OR' | 'AND'>(labelFilterMode);
 
-  const toggleLabel = (label: CityLabel) => {
-    if (tempSelectedLabels.includes(label)) {
-      setTempSelectedLabels(tempSelectedLabels.filter(l => l !== label));
-    } else {
-      setTempSelectedLabels([...tempSelectedLabels, label]);
-    }
-  };
-
-  const handleConfirm = () => {
-    onClose(tempSelectedLabels);
-  };
-
-  const handleCancel = () => {
-    setTempSelectedLabels(selectedLabels);
-    onClose(selectedLabels);
-  };
-
-  const handleClearAll = () => {
-    setTempSelectedLabels([]);
-  };
-
-  const allLabels = Object.keys(CITY_LABELS) as CityLabel[];
-
-  // Grouper les labels par catégorie
-  const labelGroups = {
-    'Activités & Nature': [
-      'plage-mer',
-      'sports-nautiques',
-      'montagne',
-      'randonnee',
-      'nature-ecotourisme',
-      'sports-hiver',
-    ] as CityLabel[],
-    'Culture & Patrimoine': [
-      'culture-histoire',
-      'art-architecture',
-      'gastronomie',
-      'oenologie',
-    ] as CityLabel[],
-    'Lifestyle & Détente': [
-      'kid-friendly',
-      'ville-thermale',
-      'vie-nocturne',
-      'shopping',
-    ] as CityLabel[],
+  const toggle = (label: CityLabel) => {
+    setTempSelected(prev =>
+      prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
+    );
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={handleCancel}
-    >
-      <Pressable style={styles.overlay} onPress={handleCancel}>
-        <Pressable style={styles.modalContainer} onPress={(e) => e.stopPropagation()}>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={() => onClose(selectedLabels, labelFilterMode)}>
+      <Pressable style={styles.overlay} onPress={() => onClose(selectedLabels, labelFilterMode)}>
+        <Pressable style={styles.sheet} onPress={e => e.stopPropagation()}>
+
           {/* Header */}
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Centres d'intérêt</Text>
-            <TouchableOpacity onPress={handleCancel}>
-              <Text style={styles.closeButton}>✕</Text>
+          <View style={styles.header}>
+            <Text style={styles.title}>Centres d'intérêt</Text>
+            <TouchableOpacity onPress={() => onClose(selectedLabels, labelFilterMode)}>
+              <Text style={styles.closeBtn}>✕</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Actions */}
+          {/* Clear */}
           <View style={styles.actionsBar}>
-            <Text style={styles.selectedCount}>
-              {tempSelectedLabels.length} sélectionné{tempSelectedLabels.length > 1 ? 's' : ''}
+            <Text style={styles.countText}>
+              {tempSelected.length} sélectionné{tempSelected.length > 1 ? 's' : ''}
             </Text>
-            {tempSelectedLabels.length > 0 && (
-              <TouchableOpacity onPress={handleClearAll}>
-                <Text style={styles.clearButton}>Tout effacer</Text>
+            {tempSelected.length > 0 && (
+              <TouchableOpacity onPress={() => setTempSelected([])}>
+                <Text style={styles.clearBtn}>Tout effacer</Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {/* Content */}
-          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-            {Object.entries(labelGroups).map(([groupName, groupLabels]) => (
-              <View key={groupName} style={styles.labelGroup}>
-                <Text style={styles.groupTitle}>{groupName}</Text>
-                {groupLabels.map((label) => {
-                  const labelInfo = CITY_LABELS[label];
-                  const isSelected = tempSelectedLabels.includes(label);
-
-                  return (
-                    <TouchableOpacity
-                      key={label}
-                      style={[
-                        styles.checkboxRow,
-                        isSelected && styles.checkboxRowSelected
-                      ]}
-                      onPress={() => toggleLabel(label)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.checkboxLeft}>
-                        <View style={[
-                          styles.checkbox,
-                          isSelected && { backgroundColor: labelInfo.color, borderColor: labelInfo.color }
-                        ]}>
-                          {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                        </View>
-                        <Text style={styles.labelIcon}>{labelInfo.icon}</Text>
-                        <Text style={styles.labelName}>{labelInfo.name}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            ))}
+          {/* Labels */}
+          <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            {UI_LABELS.map(label => {
+              const info = CITY_LABELS[label];
+              const selected = tempSelected.includes(label);
+              return (
+                <TouchableOpacity
+                  key={label}
+                  style={[styles.row, selected && styles.rowSelected]}
+                  onPress={() => toggle(label)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.checkbox, selected && { backgroundColor: info.color, borderColor: info.color }]}>
+                    {selected && <Text style={styles.checkmark}>✓</Text>}
+                  </View>
+                  <Text style={styles.rowIcon}>{info.icon}</Text>
+                  <Text style={styles.rowName}>{info.name}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
 
+          {/* AND / OR toggle (visible seulement si ≥2 labels) */}
+          {tempSelected.length >= 2 && (
+            <View style={styles.modeSection}>
+              <Text style={styles.modeLabel}>Résultats :</Text>
+              <View style={styles.modeToggle}>
+                <TouchableOpacity
+                  style={[styles.modeBtn, tempMode === 'OR' && styles.modeBtnActive]}
+                  onPress={() => setTempMode('OR')}
+                >
+                  <Text style={[styles.modeBtnText, tempMode === 'OR' && styles.modeBtnTextActive]}>
+                    Au moins un
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modeBtn, tempMode === 'AND' && styles.modeBtnActive]}
+                  onPress={() => setTempMode('AND')}
+                >
+                  <Text style={[styles.modeBtnText, tempMode === 'AND' && styles.modeBtnTextActive]}>
+                    Tous ces critères
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           {/* Footer */}
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleCancel}
-            >
-              <Text style={styles.cancelButtonText}>Annuler</Text>
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => onClose(selectedLabels, labelFilterMode)}>
+              <Text style={styles.cancelText}>Annuler</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.confirmButton}
-              onPress={handleConfirm}
-            >
-              <Text style={styles.confirmButtonText}>
-                Valider ({tempSelectedLabels.length})
-              </Text>
+            <TouchableOpacity style={styles.confirmBtn} onPress={() => onClose(tempSelected, tempMode)}>
+              <Text style={styles.confirmText}>Valider ({tempSelected.length})</Text>
             </TouchableOpacity>
           </View>
+
         </Pressable>
       </Pressable>
     </Modal>
@@ -159,145 +115,31 @@ export default function LabelSelectionModal({
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-    paddingBottom: 20,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8EAED',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#0C3823',
-  },
-  closeButton: {
-    fontSize: 24,
-    color: '#5F6368',
-    fontWeight: '300',
-  },
-  actionsBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#F7F9FC',
-  },
-  selectedCount: {
-    fontSize: 14,
-    color: '#5F6368',
-    fontWeight: '600',
-  },
-  clearButton: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#E74C3C',
-  },
-  modalContent: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  labelGroup: {
-    marginBottom: 24,
-  },
-  groupTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0C3823',
-    marginBottom: 12,
-    marginTop: 8,
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: '#F7F9FC',
-  },
-  checkboxRowSelected: {
-    backgroundColor: '#E8F5E9',
-  },
-  checkboxLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#B0BEC5',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  checkmark: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  labelIcon: {
-    fontSize: 20,
-    marginRight: 10,
-  },
-  labelName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#0C3823',
-    flex: 1,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E8EAED',
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#F7F9FC',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E8EAED',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#5F6368',
-  },
-  confirmButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#4CAF50',
-    alignItems: 'center',
-  },
-  confirmButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%', paddingBottom: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#E8EAED' },
+  title: { fontSize: 20, fontWeight: '700', color: '#0C3823' },
+  closeBtn: { fontSize: 24, color: '#5F6368', fontWeight: '300' },
+  actionsBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#F7F9FC' },
+  countText: { fontSize: 14, color: '#5F6368', fontWeight: '600' },
+  clearBtn: { fontSize: 14, fontWeight: '600', color: '#E74C3C' },
+  content: { paddingHorizontal: 20, paddingVertical: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 12, marginBottom: 8, backgroundColor: '#F7F9FC' },
+  rowSelected: { backgroundColor: '#E8F5E9' },
+  checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: '#B0BEC5', backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  checkmark: { color: '#FFF', fontSize: 14, fontWeight: '700' },
+  rowIcon: { fontSize: 22, marginRight: 10 },
+  rowName: { fontSize: 15, fontWeight: '600', color: '#0C3823', flex: 1 },
+  modeSection: { paddingHorizontal: 20, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#E8EAED' },
+  modeLabel: { fontSize: 13, fontWeight: '600', color: '#5F6368', marginBottom: 8 },
+  modeToggle: { flexDirection: 'row', gap: 8 },
+  modeBtn: { flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: '#F7F9FC', alignItems: 'center', borderWidth: 1.5, borderColor: '#E8EAED' },
+  modeBtnActive: { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' },
+  modeBtnText: { fontSize: 13, fontWeight: '600', color: '#5F6368' },
+  modeBtnTextActive: { color: '#2E7D32' },
+  footer: { flexDirection: 'row', paddingHorizontal: 20, paddingTop: 12, gap: 12, borderTopWidth: 1, borderTopColor: '#E8EAED' },
+  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: '#F7F9FC', alignItems: 'center', borderWidth: 1, borderColor: '#E8EAED' },
+  cancelText: { fontSize: 16, fontWeight: '600', color: '#5F6368' },
+  confirmBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, backgroundColor: '#4CAF50', alignItems: 'center' },
+  confirmText: { fontSize: 16, fontWeight: '700', color: '#FFF' },
 });

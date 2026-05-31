@@ -8,6 +8,7 @@ export type CityLabel =
   | 'gastronomie'
   | 'plage-mer'
   | 'montagne'
+  | 'lacs-rivieres'
   | 'oenologie'
   | 'sports-hiver'
   | 'ville-thermale'
@@ -24,6 +25,7 @@ export const CITY_LABELS: Record<CityLabel, { name: string; icon: string; color:
   'gastronomie': { name: 'Gastronomie', icon: '🍽️', color: '#FFA07A' },
   'plage-mer': { name: 'Plage & Mer', icon: '🏖️', color: '#56CCF2' },
   'montagne': { name: 'Montagne', icon: '⛰️', color: '#8B7355' },
+  'lacs-rivieres': { name: 'Lacs & Rivières', icon: '🏊', color: '#3FA7D6' },
   'oenologie': { name: 'Vin & Vignobles', icon: '🍷', color: '#8B4789' },
   'sports-hiver': { name: 'Sports d\'hiver', icon: '⛷️', color: '#AED9E0' },
   'ville-thermale': { name: 'Bien-être', icon: '♨️', color: '#FFB6B9' },
@@ -33,6 +35,33 @@ export const CITY_LABELS: Record<CityLabel, { name: string; icon: string; color:
   'shopping': { name: 'Shopping', icon: '🛍️', color: '#E74C3C' },
 };
 
+// Les 7 tags exposés dans l'UI de filtrage (les autres restent dans les données)
+export const UI_LABELS: CityLabel[] = [
+  'plage-mer',
+  'montagne',
+  'lacs-rivieres',
+  'sports-hiver',
+  'randonnee',
+  'culture-histoire',
+  'gastronomie',
+  'kid-friendly',
+];
+
+export interface TagEvidence {
+  label: CityLabel;
+  reason: string;       // ex: "Lac d'Annecy (2 727 ha) à 0,5 km"
+  source: string;       // URL cliquable dans l'app
+  linkLabel: string;    // Texte du bouton lien
+  confidence: number;   // 0-100
+}
+
+export interface StationData {
+  tags: TagEvidence[];
+  description?: string;    // Résumé court de la ville
+  wikipediaUrl?: string;   // Page Wikipedia complète
+  thumbnailUrl?: string;   // Image Wikipedia
+}
+
 export interface Station {
   id: number | string;
   name: string;
@@ -40,38 +69,38 @@ export interface Station {
   lat: number;
   lon: number;
   labels?: CityLabel[];
-  real_name?: string; // Nom de la vraie gare pour les destinations groupées "Toutes les gares"
+  real_name?: string;
 }
 
 export interface SearchParams {
   from_station_id: number;
   mode: 'time' | 'budget' | 'both';
-  max_time?: number; // en minutes
-  max_budget?: number; // en euros
-  max_value?: number; // pour compatibilité ancienne version
+  max_time?: number;
+  max_budget?: number;
+  max_value?: number;
 }
 
 export interface SearchResult {
   id: number | string;
   search_id: number;
-  from_station?: Station; // Gare de départ (optionnel pour compatibilité)
+  from_station?: Station;
   to_station_id: number | string;
   to_station: Station;
-  duration: number; // en minutes
-  price: number; // en euros (prix moyen)
-  priceRange?: { min: number; max: number }; // Range de prix estimé
+  duration: number;
+  price: number;
+  priceRange?: { min: number; max: number };
   departure_time: string;
   arrival_time?: string;
-  nb_transfers?: number; // Deprecated: use transfers instead
-  transfers?: number; // Nombre de correspondances (0 = direct, 1 = 1 changement, etc.)
-  transferStation?: string; // Nom de la gare de correspondance
-  transferLat?: number; // Latitude de la gare de correspondance
-  transferLon?: number; // Longitude de la gare de correspondance
-  transferArrival?: string; // Heure d'arrivée à la gare de correspondance
-  transferDeparture?: string; // Heure de départ de la gare de correspondance
-  route_name?: string; // Nom de la route (ex: TGV, TER, etc.)
-  route_type?: 'TGV' | 'INTERCITES' | 'TER' | 'RER' | 'AUTRE'; // Type de train
-  navitia_data?: any; // Données complètes de Navitia si disponibles
+  nb_transfers?: number;
+  transfers?: number;
+  transferStation?: string;
+  transferLat?: number;
+  transferLon?: number;
+  transferArrival?: string;
+  transferDeparture?: string;
+  route_name?: string;
+  route_type?: 'TGV' | 'INTERCITES' | 'TER' | 'RER' | 'AUTRE';
+  navitia_data?: any;
 }
 
 export interface Search {

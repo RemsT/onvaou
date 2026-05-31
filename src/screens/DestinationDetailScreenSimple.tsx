@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Linking,
   Alert,
+  Image,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
@@ -15,6 +16,8 @@ import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigatorSimple';
+import { CITY_LABELS, CityLabel } from '../types';
+import { getStationData } from '../data/stationLabels';
 
 type DestinationDetailRouteProp = RouteProp<
   RootStackParamList,
@@ -27,6 +30,12 @@ export default function DestinationDetailScreen() {
   const navigation = useNavigation<DestinationDetailNavigationProp>();
   const { destination, searchDate, mapParams } = route.params;
   const [mapReady, setMapReady] = useState(false);
+  const [expandedTag, setExpandedTag] = useState<CityLabel | null>(null);
+
+  const numericDestId = typeof destination.to_station_id === 'number'
+    ? destination.to_station_id
+    : parseInt(String(destination.to_station_id));
+  const stationData = getStationData(numericDestId);
 
   /**
    * Construit l'URL SNCF Connect avec les paramètres pré-remplis
@@ -195,6 +204,75 @@ export default function DestinationDetailScreen() {
             <Text style={styles.mapButtonText}>Carte des destinations</Text>
           </TouchableOpacity>
         </View>
+
+        {/* À propos + Wikipedia */}
+        {stationData && (stationData.description || stationData.tags.length > 0) && (
+          <View style={styles.section}>
+            {stationData.thumbnailUrl ? (
+              <Image
+                source={{ uri: stationData.thumbnailUrl }}
+                style={styles.cityThumbnail}
+                resizeMode="cover"
+              />
+            ) : null}
+            {stationData.description ? (
+              <Text style={styles.cityDescription}>{stationData.description}</Text>
+            ) : null}
+            {stationData.wikipediaUrl ? (
+              <TouchableOpacity
+                onPress={() => Linking.openURL(stationData.wikipediaUrl!).catch(() => {})}
+                style={styles.wikiLink}
+              >
+                <Ionicons name="open-outline" size={14} color="#1565C0" />
+                <Text style={styles.wikiLinkText}>Découvrir sur Wikipedia →</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {/* Tags cliquables */}
+            {stationData.tags.length > 0 && (
+              <View style={styles.tagsSection}>
+                <Text style={styles.tagsSectionTitle}>Activités</Text>
+                <View style={styles.tagsRow}>
+                  {stationData.tags.map(tagEvidence => {
+                    const info = CITY_LABELS[tagEvidence.label];
+                    if (!info) return null;
+                    const isExpanded = expandedTag === tagEvidence.label;
+                    return (
+                      <View key={tagEvidence.label}>
+                        <TouchableOpacity
+                          style={[
+                            styles.tagBadge,
+                            { backgroundColor: info.color + '20', borderColor: info.color },
+                            isExpanded && { backgroundColor: info.color + '40' },
+                          ]}
+                          onPress={() => setExpandedTag(prev => prev === tagEvidence.label ? null : tagEvidence.label)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.tagIcon}>{info.icon}</Text>
+                          <Text style={[styles.tagName, { color: info.color }]}>{info.name}</Text>
+                        </TouchableOpacity>
+                        {isExpanded && (
+                          <View style={[styles.tagEvidence, { borderLeftColor: info.color }]}>
+                            <Text style={styles.tagReason}>{tagEvidence.reason}</Text>
+                            {tagEvidence.source ? (
+                              <TouchableOpacity
+                                onPress={() => Linking.openURL(tagEvidence.source).catch(() => {})}
+                              >
+                                <Text style={[styles.tagSourceLink, { color: info.color }]}>
+                                  {tagEvidence.linkLabel || 'En savoir plus'} →
+                                </Text>
+                              </TouchableOpacity>
+                            ) : null}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Infos principales - Sur une seule ligne */}
         <View style={styles.section}>
@@ -448,6 +526,79 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 20,
+  },
+  // Wikipedia & description
+  cityThumbnail: {
+    width: '100%',
+    height: 160,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  cityDescription: {
+    fontSize: 13,
+    color: '#444',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  wikiLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 12,
+  },
+  wikiLinkText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1565C0',
+  },
+  // Tags / activités
+  tagsSection: {
+    marginTop: 4,
+  },
+  tagsSectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0C3823',
+    marginBottom: 10,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  tagBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  tagIcon: {
+    fontSize: 14,
+  },
+  tagName: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  tagEvidence: {
+    marginTop: 6,
+    marginBottom: 4,
+    padding: 10,
+    backgroundColor: '#F7F9FC',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+  },
+  tagReason: {
+    fontSize: 12,
+    color: '#333',
+    lineHeight: 18,
+    marginBottom: 4,
+  },
+  tagSourceLink: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   sectionTitle: {
     fontSize: 18,

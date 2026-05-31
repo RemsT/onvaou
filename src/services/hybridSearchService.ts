@@ -55,7 +55,8 @@ export class HybridSearchService {
     selectedLabels?: CityLabel[],
     timeRangeStart?: string,
     timeRangeEnd?: string,
-    maxTransfers: number = 1 // 0 = direct only, 1 = at most 1 transfer, 2 = allow 2 transfers
+    maxTransfers: number = 1,
+    labelFilterMode: 'OR' | 'AND' = 'OR'
   ): Promise<SearchResult[]> {
     // Utilisation des données locales uniquement (APIs désactivées temporairement)
     console.log('Utilisation des données locales avec estimation des prix');
@@ -93,7 +94,8 @@ export class HybridSearchService {
           timeRangeStart,
           timeRangeEnd,
           datetime,
-          maxTransfers
+          maxTransfers,
+          labelFilterMode
         )
       );
 
@@ -133,7 +135,8 @@ export class HybridSearchService {
       timeRangeStart,
       timeRangeEnd,
       datetime,
-      maxTransfers
+      maxTransfers,
+      labelFilterMode
     );
   }
 }
