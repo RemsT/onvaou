@@ -48,7 +48,6 @@ export default function StationLabels({
                 expandedLabel === tag.label && styles.labelBadgeExpanded,
               ]}
             >
-              {!compact && <Text style={styles.labelIcon}>{info.icon}</Text>}
               {!compact && (
                 <Text style={[styles.labelText, { color: info.color }]}>{info.name}</Text>
               )}

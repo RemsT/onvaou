@@ -26,9 +26,13 @@ describe('stationLabels — données manuelles', () => {
 
     it('retourne les labels de Bordeaux (id=1878)', () => {
       const labels = getStationLabels(ID_BORDEAUX);
-      expect(labels).toContain('oenologie');
       expect(labels).toContain('gastronomie');
       expect(labels).toContain('culture-histoire');
+    });
+
+    it('ne retourne que les tags de la liste UI (pas oenologie)', () => {
+      const labels = getStationLabels(ID_BORDEAUX);
+      expect(labels).not.toContain('oenologie'); // hors UI_LABELS → masqué
     });
 
     it('retourne [] pour une gare inconnue', () => {
@@ -159,6 +163,29 @@ describe('countLabelMatches', () => {
 
   it('fonctionne avec des ids string', () => {
     expect(countLabelMatches(String(ID_ANNECY), ['lacs-rivieres'])).toBe(1);
+  });
+});
+
+describe('résolution d\'identifiant (robustesse base évolutive)', () => {
+  it('résout via ID interne (3175 → Annecy)', () => {
+    expect(getStationLabels(3175)).toContain('lacs-rivieres');
+  });
+
+  it('résout via code UIC direct (87746008 → Annecy)', () => {
+    expect(getStationLabels('87746008')).toContain('lacs-rivieres');
+  });
+
+  it('résout via sncf_id complet (stop_area:OCE:SA:87746008 → Annecy)', () => {
+    expect(getStationLabels('stop_area:OCE:SA:87746008')).toContain('lacs-rivieres');
+  });
+
+  it('getStationData fonctionne avec les 3 formats d\'identifiant', () => {
+    const byInternal = getStationData(3175);
+    const byUic = getStationData('87746008');
+    const bySncf = getStationData('stop_area:OCE:SA:87746008');
+    expect(byInternal).not.toBeNull();
+    expect(byInternal).toEqual(byUic);
+    expect(byUic).toEqual(bySncf);
   });
 });
 

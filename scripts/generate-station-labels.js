@@ -278,21 +278,29 @@ async function main() {
   const allStationsPath = path.join(__dirname, '..', 'src', 'data', 'allStations.ts');
   const rawStations = fs.readFileSync(allStationsPath, 'utf8');
 
-  // Parser les gares (format TypeScript → JSON approximatif)
-  const stationMatches = [...rawStations.matchAll(/\{[^}]*id:\s*(\d+)[^}]*name:\s*['"]([^'"]+)['"][^}]*lat:\s*([\d.]+)[^}]*lon:\s*([\-\d.]+)[^}]*\}/g)];
-  const stations = stationMatches.map(m => ({
-    id: parseInt(m[1]),
-    name: m[2],
-    lat: parseFloat(m[3]),
-    lon: parseFloat(m[4]),
-  }));
+  // Parser les gares (format TypeScript → JSON approximatif), incluant sncf_id
+  const stationMatches = [...rawStations.matchAll(/\{[^}]*id:\s*(\d+)[^}]*name:\s*['"]([^'"]+)['"][^}]*sncf_id:\s*['"]([^'"]+)['"][^}]*lat:\s*([\d.]+)[^}]*lon:\s*([\-\d.]+)[^}]*\}/g)];
+  const stations = stationMatches.map(m => {
+    const uicMatch = m[3].match(/(\d{8})/);
+    return {
+      id: parseInt(m[1]),
+      name: m[2],
+      sncf_id: m[3],
+      uic: uicMatch ? uicMatch[1] : null,
+      lat: parseFloat(m[4]),
+      lon: parseFloat(m[5]),
+    };
+  });
 
   console.log(`📊 ${stations.length} gares à traiter`);
 
-  // Lire stationLabels.ts existant pour ne pas écraser les données manuelles (IDs 1-92)
-  const MANUAL_IDS = new Set(Array.from({ length: 92 }, (_, i) => i + 1));
-  const toProcess = stations.filter(s => !MANUAL_IDS.has(s.id));
-  console.log(`⚙️  ${toProcess.length} gares à traiter (${MANUAL_IDS.size} manuelles conservées)`);
+  // Codes UIC déjà tagués manuellement dans stationLabels.ts (à ne pas écraser)
+  const existingLabels = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'data', 'stationLabels.ts'), 'utf8'
+  );
+  const MANUAL_UICS = new Set([...existingLabels.matchAll(/"(\d{8})":\s*\{/g)].map(m => m[1]));
+  const toProcess = stations.filter(s => s.uic && !MANUAL_UICS.has(s.uic));
+  console.log(`⚙️  ${toProcess.length} gares à traiter (${MANUAL_UICS.size} manuelles conservées)`);
 
   if (DRY_RUN) {
     console.log('\n📋 Mode DRY RUN — exemple sur 5 gares :');
@@ -316,19 +324,19 @@ async function main() {
 
     const result = await tagStation(station);
     if (result.tags.length > 0) {
-      outputData[station.id] = result;
+      outputData[station.uic] = result; // clé = code UIC stable
       tagged++;
       for (const t of result.tags) {
         stats[t.label] = (stats[t.label] || 0) + 1;
-        if (t.confidence < 70) lowConfidence.push({ station: station.name, id: station.id, ...t });
+        if (t.confidence < 70) lowConfidence.push({ station: station.name, uic: station.uic, ...t });
       }
     }
 
-    // Appliquer manual_overrides
-    const overrides = MANUAL_OVERRIDES[station.id];
-    if (overrides) {
-      if (overrides.add) outputData[station.id].tags.push(...overrides.add);
-      if (overrides.remove) outputData[station.id].tags = outputData[station.id].tags.filter(t => !overrides.remove.includes(t.label));
+    // Appliquer manual_overrides (clé = code UIC)
+    const overrides = MANUAL_OVERRIDES[station.uic];
+    if (overrides && outputData[station.uic]) {
+      if (overrides.add) outputData[station.uic].tags.push(...overrides.add);
+      if (overrides.remove) outputData[station.uic].tags = outputData[station.uic].tags.filter(t => !overrides.remove.includes(t.label));
     }
 
     await sleep(200); // Respecter les rate limits des APIs
@@ -338,7 +346,7 @@ async function main() {
   const report = {
     generated_at: new Date().toISOString(),
     total_stations: stations.length,
-    manual_stations: MANUAL_IDS.size,
+    manual_stations: MANUAL_UICS.size,
     auto_tagged_stations: tagged,
     by_label: stats,
     low_confidence: lowConfidence.slice(0, 50),
@@ -356,7 +364,7 @@ async function main() {
       const tagsStr = data.tags.map(t =>
         `    { label: '${t.label}', reason: ${JSON.stringify(t.reason)}, source: ${JSON.stringify(t.source)}, linkLabel: ${JSON.stringify(t.linkLabel)}, confidence: ${t.confidence} },`
       ).join('\n');
-      return `  ${id}: {\n    description: ${JSON.stringify(data.description || '')},\n    wikipediaUrl: ${JSON.stringify(data.wikipediaUrl || '')},\n    thumbnailUrl: ${JSON.stringify(data.thumbnailUrl || '')},\n    tags: [\n${tagsStr}\n    ],\n  },`;
+      return `  "${id}": {\n    description: ${JSON.stringify(data.description || '')},\n    wikipediaUrl: ${JSON.stringify(data.wikipediaUrl || '')},\n    thumbnailUrl: ${JSON.stringify(data.thumbnailUrl || '')},\n    tags: [\n${tagsStr}\n    ],\n  },`;
     })
     .join('\n');
 

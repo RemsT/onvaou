@@ -248,7 +248,6 @@ export default function DestinationDetailScreen() {
                           onPress={() => setExpandedTag(prev => prev === tagEvidence.label ? null : tagEvidence.label)}
                           activeOpacity={0.7}
                         >
-                          <Text style={styles.tagIcon}>{info.icon}</Text>
                           <Text style={[styles.tagName, { color: info.color }]}>{info.name}</Text>
                         </TouchableOpacity>
                         {isExpanded && (

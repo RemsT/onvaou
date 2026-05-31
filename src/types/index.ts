@@ -1,41 +1,27 @@
 // Types pour l'application ONvaOU
 
 export type CityLabel =
-  | 'kid-friendly'
-  | 'sports-nautiques'
-  | 'randonnee'
-  | 'culture-histoire'
-  | 'gastronomie'
   | 'plage-mer'
   | 'montagne'
   | 'lacs-rivieres'
-  | 'oenologie'
   | 'sports-hiver'
-  | 'ville-thermale'
-  | 'art-architecture'
-  | 'nature-ecotourisme'
-  | 'vie-nocturne'
-  | 'shopping';
+  | 'randonnee'
+  | 'culture-histoire'
+  | 'gastronomie'
+  | 'kid-friendly';
 
 export const CITY_LABELS: Record<CityLabel, { name: string; icon: string; color: string }> = {
-  'kid-friendly': { name: 'Famille', icon: '👨‍👩‍👧‍👦', color: '#FF6B6B' },
-  'sports-nautiques': { name: 'Sports nautiques', icon: '🏄', color: '#4ECDC4' },
-  'randonnee': { name: 'Randonnée', icon: '🥾', color: '#95E1D3' },
-  'culture-histoire': { name: 'Culture & Histoire', icon: '🏛️', color: '#F38181' },
-  'gastronomie': { name: 'Gastronomie', icon: '🍽️', color: '#FFA07A' },
   'plage-mer': { name: 'Plage & Mer', icon: '🏖️', color: '#56CCF2' },
   'montagne': { name: 'Montagne', icon: '⛰️', color: '#8B7355' },
   'lacs-rivieres': { name: 'Lacs & Rivières', icon: '🏊', color: '#3FA7D6' },
-  'oenologie': { name: 'Vin & Vignobles', icon: '🍷', color: '#8B4789' },
   'sports-hiver': { name: 'Sports d\'hiver', icon: '⛷️', color: '#AED9E0' },
-  'ville-thermale': { name: 'Bien-être', icon: '♨️', color: '#FFB6B9' },
-  'art-architecture': { name: 'Art & Design', icon: '🎨', color: '#C7CEEA' },
-  'nature-ecotourisme': { name: 'Nature & Éco', icon: '🌿', color: '#7AC74F' },
-  'vie-nocturne': { name: 'Vie nocturne', icon: '🎉', color: '#9B59B6' },
-  'shopping': { name: 'Shopping', icon: '🛍️', color: '#E74C3C' },
+  'randonnee': { name: 'Randonnée', icon: '🥾', color: '#95E1D3' },
+  'culture-histoire': { name: 'Culture & Histoire', icon: '🏛️', color: '#F38181' },
+  'gastronomie': { name: 'Gastronomie', icon: '🍽️', color: '#FFA07A' },
+  'kid-friendly': { name: 'Famille', icon: '👨‍👩‍👧‍👦', color: '#FF6B6B' },
 };
 
-// Les 7 tags exposés dans l'UI de filtrage (les autres restent dans les données)
+// Les 8 tags exposés dans l'UI de filtrage
 export const UI_LABELS: CityLabel[] = [
   'plage-mer',
   'montagne',

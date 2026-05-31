@@ -115,7 +115,7 @@ export default function ResultsListScreen() {
         </View>
         {topTag && topTagInfo ? (
           <Text style={[styles.topTagText, { color: topTagInfo.color }]}>
-            {topTagInfo.icon} {topTag.reason}
+            {topTag.reason}
           </Text>
         ) : null}
       </TouchableOpacity>

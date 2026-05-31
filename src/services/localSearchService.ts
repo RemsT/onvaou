@@ -1,7 +1,7 @@
 import { Station, SearchResult, CityLabel } from '../types';
 import { frenchStations } from '../data/frenchStations';
 import { LocationService } from './locationService';
-import { filterStationsByLabels, countLabelMatches } from '../data/stationLabels';
+import { getStationLabels, countLabelMatches } from '../data/stationLabels';
 import { PriceEstimationService } from './priceEstimationService';
 import { gtfsDbEnhanced, JourneyWithTransfer } from './gtfsDatabaseServiceEnhanced';
 
@@ -880,18 +880,22 @@ export class LocalSearchService {
       });
 
       // Filtrer par labels si nécessaire
+      // On utilise le sncf_id (code UIC) qui indexe directement les tags,
+      // avec fallback sur to_station_id si absent.
+      const tagKey = (r: SearchResult): string | number =>
+        r.to_station?.sncf_id || r.to_station_id;
+
       if (selectedLabels && selectedLabels.length > 0) {
-        const filteredIds = filterStationsByLabels(
-          results.map(r => r.to_station_id),
-          selectedLabels,
-          labelFilterMode
-        );
-        results = results.filter(r => filteredIds.includes(r.to_station_id));
+        results = results.filter(r => {
+          const labels = getStationLabels(tagKey(r));
+          if (labelFilterMode === 'AND') return selectedLabels.every(l => labels.includes(l));
+          return selectedLabels.some(l => labels.includes(l));
+        });
 
         // Trier par nombre de labels correspondants, puis par durée
         results.sort((a, b) => {
-          const matchesA = countLabelMatches(a.to_station_id, selectedLabels);
-          const matchesB = countLabelMatches(b.to_station_id, selectedLabels);
+          const matchesA = countLabelMatches(tagKey(a), selectedLabels);
+          const matchesB = countLabelMatches(tagKey(b), selectedLabels);
           if (matchesB !== matchesA) {
             return matchesB - matchesA;
           }
