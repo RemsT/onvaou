@@ -403,8 +403,6 @@ export default function DestinationDetailScreen() {
 
         {/* Réservation */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Rechercher sur SNCF Connect</Text>
-
           <TouchableOpacity
             style={styles.bookingButton}
             onPress={handleBooking}
