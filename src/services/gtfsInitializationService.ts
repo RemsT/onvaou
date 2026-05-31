@@ -718,9 +718,43 @@ class GTFSInitializationService {
   }
 
   /**
-   * Indique si les données GTFS sont périmées (> 30 jours).
+   * Retourne la date maximale couverte par les données GTFS (format YYYYMMDD),
+   * ou null si indéterminée.
+   */
+  async getGTFSMaxDate(): Promise<string | null> {
+    try {
+      const db = await SQLite.openDatabaseAsync(this.dbName, { useNewConnection: true });
+      const row = await db.getFirstAsync<{ maxDate: string }>(
+        'SELECT MAX(date) as maxDate FROM calendar_dates'
+      );
+      await db.closeAsync();
+      return row?.maxDate || null;
+    } catch (error) {
+      console.warn('⚠️ Impossible de lire la couverture GTFS:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Indique si les données GTFS sont périmées.
+   * Périmé si : la date max couverte est dépassée (ou < 7 jours dans le futur),
+   * OU si le dernier téléchargement date de plus de 180 jours.
    */
   async isGTFSStale(): Promise<boolean> {
+    // 1. Vérifier la couverture réelle des dates (critère prioritaire)
+    const maxDate = await this.getGTFSMaxDate();
+    if (maxDate) {
+      const today = new Date();
+      const todayStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+      // Marge : on considère périmé si on couvre moins de 7 jours à venir
+      const soon = new Date(today.getTime() + 7 * 86_400_000)
+        .toISOString().slice(0, 10).replace(/-/g, '');
+      if (maxDate < soon) {
+        console.log(`📅 GTFS périmé : couverture jusqu'à ${maxDate}, besoin de ${todayStr}+`);
+        return true;
+      }
+    }
+    // 2. Fallback : âge du téléchargement
     const age = await this.getGTFSAgeDays();
     return age > GTFS_MAX_AGE_DAYS;
   }

@@ -67,10 +67,11 @@ export const useGTFSInitialization = (): UseGTFSInitializationReturn => {
       const alreadyInitialized = await gtfsInitService.isDatabaseInitialized();
 
       if (alreadyInitialized && !forceReset) {
-        // Vérifier si un nouveau build a été installé
+        // Re-télécharger si nouveau build OU si les données ne couvrent plus les dates actuelles
         const buildChanged = await gtfsInitService.hasAppBuildChanged();
-        if (buildChanged) {
-          console.log('🆕 Nouveau build détecté — mise à jour GTFS...');
+        const stale = await gtfsInitService.isGTFSStale();
+        if (buildChanged || stale) {
+          console.log(`🔄 Mise à jour GTFS (build changé: ${buildChanged}, données périmées: ${stale})...`);
           setIsInitializing(true);
           setProgress({ step: 'download', progress: 0, message: 'Mise à jour des horaires SNCF...' });
           const ok = await gtfsInitService.downloadAndUpdateGTFS((prog) => setProgress(prog));
@@ -78,9 +79,16 @@ export const useGTFSInitialization = (): UseGTFSInitializationReturn => {
             await gtfsInitService.saveCurrentAppBuild();
             await tariffService.loadTariffs();
             setIsGTFSStale(false);
+            setIsInitialized(true);
+            setTimeout(() => setIsInitializing(false), 1000);
+            return;
           }
+          // Échec du téléchargement (hors-ligne) : continuer avec les données existantes
+          console.warn('⚠️ Mise à jour échouée, utilisation des données existantes');
+          setIsGTFSStale(stale);
           setIsInitialized(true);
-          setTimeout(() => setIsInitializing(false), 1000);
+          setIsInitializing(false);
+          tariffService.loadTariffs().catch(() => {});
           return;
         }
 
