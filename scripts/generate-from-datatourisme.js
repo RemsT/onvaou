@@ -88,6 +88,7 @@ async function main() {
     stationGrid.get(k).push(s);
     s.counts = {};      // { tag: count }
     s.pois = {};        // { tag: [{name, url, dist}] } — 3 plus proches
+    s.communes = {};    // { commune: count } → ville dominante pour le lien Wikipédia
   }
   const TOP_POIS = 3;
 
@@ -113,6 +114,9 @@ async function main() {
     // URL officielle du lieu : 1ère URL http(s) trouvée dans le champ Contacts
     const urlMatch = (cols[10] || '').match(/https?:\/\/[^\s#|<>"]+/);
     const url = urlMatch ? urlMatch[0] : '';
+
+    // Commune du POI (col 5 "Code_postal_et_commune" = "08170#Haybes")
+    const commune = (cols[5] || '').split('#')[1] || '';
 
     // Quel(s) tag(s) ce POI représente-t-il ?
     const poiTags = new Set();
@@ -148,6 +152,10 @@ async function main() {
                 }
               }
             }
+          }
+          // Commune dominante : POI à moins de 5 km de la gare
+          if (commune && dist <= 5) {
+            s.communes[commune] = (s.communes[commune] || 0) + 1;
           }
         }
       }
@@ -189,7 +197,15 @@ async function main() {
     }
     if (tags.length > 0) {
       tags.sort((a, b) => b._count - a._count);
-      out[s.uic] = tags.map(({ _count, ...t }) => t);
+      // Commune dominante → lien Wikipédia de la ville
+      let wikipediaUrl;
+      const communes = Object.entries(s.communes);
+      if (communes.length > 0) {
+        communes.sort((a, b) => b[1] - a[1]);
+        const city = communes[0][0].replace(/\s+\d+(er|e)?$/i, '').trim(); // retire arrondissement
+        if (city) wikipediaUrl = 'https://fr.wikipedia.org/wiki/' + encodeURIComponent(city.replace(/ /g, '_'));
+      }
+      out[s.uic] = { wikipediaUrl, tags: tags.map(({ _count, ...t }) => t) };
     }
   }
 
@@ -197,14 +213,15 @@ async function main() {
   console.log('Par tag :', JSON.stringify(stats, null, 0));
 
   // 4. Écrire le fichier généré
-  const entries = Object.entries(out).map(([uic, tags]) => {
-    const tagsStr = tags.map(t => {
+  const entries = Object.entries(out).map(([uic, data]) => {
+    const tagsStr = data.tags.map(t => {
       const poisStr = (t.pois && t.pois.length)
         ? `, pois: ${JSON.stringify(t.pois)}`
         : '';
       return `    { label: '${t.label}', reason: ${JSON.stringify(t.reason)}, source: ${JSON.stringify(t.source)}, linkLabel: ${JSON.stringify(t.linkLabel)}, confidence: ${t.confidence}${poisStr} },`;
     }).join('\n');
-    return `  "${uic}": {\n    tags: [\n${tagsStr}\n    ],\n  },`;
+    const wikiStr = data.wikipediaUrl ? `    wikipediaUrl: ${JSON.stringify(data.wikipediaUrl)},\n` : '';
+    return `  "${uic}": {\n${wikiStr}    tags: [\n${tagsStr}\n    ],\n  },`;
   }).join('\n');
 
   const header = `// AUTO-GÉNÉRÉ depuis DATAtourisme (data.gouv.fr / ADN Tourisme) — ${new Date().toISOString().slice(0, 10)}\n// NE PAS ÉDITER À LA MAIN. Régénérer : node scripts/generate-from-datatourisme.js\nimport { StationData } from '../types';\n\nexport const generatedLabels: Record<string, StationData> = {\n`;
