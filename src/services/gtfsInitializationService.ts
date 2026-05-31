@@ -10,7 +10,7 @@ import { Asset } from 'expo-asset';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { unzipSync, strFromU8 } from 'fflate';
 import { LocalSearchService } from './localSearchService';
-import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 
 const GTFS_ZIP_URL =
   'https://eu.ftp.opendatasoft.com/sncf/gtfs/export_gtfs_voyages.zip';
@@ -691,7 +691,7 @@ class GTFSInitializationService {
   // ─────────────────────────────────────────────
 
   private getCurrentAppBuild(): string {
-    return `${Constants.nativeAppVersion ?? '0'}.${Constants.nativeBuildVersion ?? '0'}`;
+    return `${Application.nativeApplicationVersion ?? '0'}.${Application.nativeBuildVersion ?? '0'}`;
   }
 
   async hasAppBuildChanged(): Promise<boolean> {

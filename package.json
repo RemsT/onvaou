@@ -22,7 +22,10 @@
       "^expo-file-system$": "<rootDir>/__mocks__/expo-file-system-legacy.ts",
       "^@react-native-async-storage/async-storage$": "<rootDir>/__mocks__/async-storage.ts"
     },
-    "testMatch": ["**/__tests__/**/*.test.ts", "**/__tests__/**/*.test.tsx"],
+    "testMatch": [
+      "**/__tests__/**/*.test.ts",
+      "**/__tests__/**/*.test.tsx"
+    ],
     "collectCoverageFrom": [
       "src/services/**/*.ts",
       "!src/services/locationService.ts"
@@ -39,6 +42,7 @@
     "axios": "^1.12.2",
     "claude": "^0.1.2",
     "expo": "54.0.20",
+    "expo-application": "~7.0.8",
     "expo-asset": "^12.0.9",
     "expo-checkbox": "^5.0.7",
     "expo-clipboard": "~8.0.7",
