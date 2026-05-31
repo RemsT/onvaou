@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, Modal, TouchableOpacity, StyleSheet, ScrollView, Pressable,
 } from 'react-native';
@@ -19,6 +19,14 @@ export default function LabelSelectionModal({
 }: LabelSelectionModalProps) {
   const [tempSelected, setTempSelected] = useState<CityLabel[]>(selectedLabels);
   const [tempMode, setTempMode] = useState<'OR' | 'AND'>(labelFilterMode);
+
+  // Re-synchroniser avec les centres déjà sélectionnés à chaque ouverture
+  useEffect(() => {
+    if (visible) {
+      setTempSelected(selectedLabels);
+      setTempMode(labelFilterMode);
+    }
+  }, [visible]);
 
   const toggle = (label: CityLabel) => {
     setTempSelected(prev =>

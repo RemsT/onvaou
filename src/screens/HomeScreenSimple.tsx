@@ -518,7 +518,17 @@ export default function HomeScreen() {
         >
           <View style={styles.labelsCardHeader}>
             <Text style={[styles.cardTitle, { marginBottom: 0 }]}>Centres d'intérêt</Text>
-            <Text style={styles.labelsCardOptional}>optionnel</Text>
+            {selectedLabels.length > 0 ? (
+              <TouchableOpacity
+                onPress={() => setSelectedLabels([])}
+                disabled={loading}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.labelsCardClear}>Effacer ✕</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.labelsCardOptional}>optionnel</Text>
+            )}
           </View>
           {selectedLabels.length === 0 ? (
             <Text style={styles.labelsCardPlaceholder}>
@@ -885,6 +895,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#9E9E9E',
     fontStyle: 'italic',
+  },
+  labelsCardClear: {
+    fontSize: 12,
+    color: '#E74C3C',
+    fontWeight: '600',
   },
   labelsCardPlaceholder: {
     fontSize: 13,
