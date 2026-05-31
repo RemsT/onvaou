@@ -474,7 +474,7 @@ export class GTFSDatabaseServiceEnhanced {
     const stopIds = await this.resolveStopIds(fromStopId);
     const ph = stopIds.map(() => '?').join(',');
 
-    // ROW_NUMBER() pour garder UN seul trajet par destination (le premier départ)
+    // ROW_NUMBER() pour garder UN seul trajet par destination (le plus rapide)
     // évite le problème de LIMIT atteint à cause des doublons (même OD, trains différents)
     let innerWhere = `from_stop_id IN (${ph})`;
     const params: any[] = [...stopIds];
@@ -488,10 +488,18 @@ export class GTFSDatabaseServiceEnhanced {
       params.push(departureTimeMax);
     }
 
+    // Durée du trajet en minutes (gère le passage de minuit via modulo 1440)
+    const durationExpr = `(
+      ((CAST(substr(arrival_time,1,2) AS INTEGER)*60 + CAST(substr(arrival_time,4,2) AS INTEGER))
+       - (CAST(substr(departure_time,1,2) AS INTEGER)*60 + CAST(substr(departure_time,4,2) AS INTEGER)) + 1440) % 1440
+    )`;
+
+    // On garde le trajet le PLUS RAPIDE par destination (pas le premier départ),
+    // sinon un TER lent partant tôt masque un TGV rapide partant plus tard.
     const query = `
       WITH best_per_dest AS (
         SELECT *,
-          ROW_NUMBER() OVER (PARTITION BY to_stop_id ORDER BY departure_time) as rn
+          ROW_NUMBER() OVER (PARTITION BY to_stop_id ORDER BY ${durationExpr} ASC, departure_time ASC) as rn
         FROM direct_connections
         WHERE ${innerWhere}
       )
