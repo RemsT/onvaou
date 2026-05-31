@@ -42,13 +42,18 @@ export default function LabelSelectionModal({
           {/* Clear */}
           <View style={styles.actionsBar}>
             <Text style={styles.countText}>
-              {tempSelected.length} sélectionné{tempSelected.length > 1 ? 's' : ''}
+              {tempSelected.length} / {UI_LABELS.length} sélectionné{tempSelected.length > 1 ? 's' : ''}
             </Text>
-            {tempSelected.length > 0 && (
-              <TouchableOpacity onPress={() => setTempSelected([])}>
-                <Text style={styles.clearBtn}>Tout effacer</Text>
+            <View style={styles.actionsButtons}>
+              <TouchableOpacity onPress={() => setTempSelected([...UI_LABELS])}>
+                <Text style={styles.selectAllBtn}>Tout sélectionner</Text>
               </TouchableOpacity>
-            )}
+              {tempSelected.length > 0 && (
+                <TouchableOpacity onPress={() => setTempSelected([])}>
+                  <Text style={styles.clearBtn}>Effacer</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           {/* Labels */}
@@ -63,10 +68,9 @@ export default function LabelSelectionModal({
                   onPress={() => toggle(label)}
                   activeOpacity={0.7}
                 >
-                  <View style={[styles.checkbox, selected && { backgroundColor: info.color, borderColor: info.color }]}>
+                  <View style={[styles.checkbox, selected && { backgroundColor: '#4CAF50', borderColor: '#4CAF50' }]}>
                     {selected && <Text style={styles.checkmark}>✓</Text>}
                   </View>
-                  <Text style={styles.rowIcon}>{info.icon}</Text>
                   <Text style={styles.rowName}>{info.name}</Text>
                 </TouchableOpacity>
               );
@@ -121,14 +125,15 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '700', color: '#0C3823' },
   closeBtn: { fontSize: 24, color: '#5F6368', fontWeight: '300' },
   actionsBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#F7F9FC' },
+  actionsButtons: { flexDirection: 'row', gap: 12 },
   countText: { fontSize: 14, color: '#5F6368', fontWeight: '600' },
+  selectAllBtn: { fontSize: 14, fontWeight: '600', color: '#4CAF50' },
   clearBtn: { fontSize: 14, fontWeight: '600', color: '#E74C3C' },
   content: { paddingHorizontal: 20, paddingVertical: 8 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12, borderRadius: 12, marginBottom: 8, backgroundColor: '#F7F9FC' },
-  rowSelected: { backgroundColor: '#E8F5E9' },
+  rowSelected: { backgroundColor: '#E8F5E9', borderWidth: 1, borderColor: '#C8E6C9' },
   checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: '#B0BEC5', backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   checkmark: { color: '#FFF', fontSize: 14, fontWeight: '700' },
-  rowIcon: { fontSize: 22, marginRight: 10 },
   rowName: { fontSize: 15, fontWeight: '600', color: '#0C3823', flex: 1 },
   modeSection: { paddingHorizontal: 20, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#E8EAED' },
   modeLabel: { fontSize: 13, fontWeight: '600', color: '#5F6368', marginBottom: 8 },

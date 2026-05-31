@@ -32,7 +32,6 @@ export default function LabelSelectionField({
                     { backgroundColor: labelInfo.color + '20', borderColor: labelInfo.color }
                   ]}
                 >
-                  <Text style={styles.labelChipIcon}>{labelInfo.icon}</Text>
                   <Text
                     style={[styles.labelChipText, { color: labelInfo.color }]}
                     numberOfLines={1}
