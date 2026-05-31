@@ -86,8 +86,10 @@ async function main() {
     const k = key(s.lat, s.lon);
     if (!stationGrid.has(k)) stationGrid.set(k, []);
     stationGrid.get(k).push(s);
-    s.counts = {}; // { tag: count }
+    s.counts = {};      // { tag: count }
+    s.pois = {};        // { tag: [{name, url, dist}] } — 3 plus proches
   }
+  const TOP_POIS = 3;
 
   // 2. Streamer le CSV des POI
   console.log('🔄 Lecture des POI DATAtourisme…');
@@ -103,9 +105,14 @@ async function main() {
 
     // Parse minimal : on a besoin des 4 premiers champs (nom, cats, lat, lon)
     const cols = parseCSVLine(line);
+    const name = (cols[0] || '').trim();
     const cats = cols[1] || '';
     const lat = parseFloat(cols[2]), lon = parseFloat(cols[3]);
     if (!lat || !lon) continue;
+
+    // URL officielle du lieu : 1ère URL http(s) trouvée dans le champ Contacts
+    const urlMatch = (cols[10] || '').match(/https?:\/\/[^\s#|<>"]+/);
+    const url = urlMatch ? urlMatch[0] : '';
 
     // Quel(s) tag(s) ce POI représente-t-il ?
     const poiTags = new Set();
@@ -128,6 +135,18 @@ async function main() {
           for (const tag of poiTags) {
             if (dist <= TAG_CONFIG[tag].radiusKm) {
               s.counts[tag] = (s.counts[tag] || 0) + 1;
+              // Garder les 3 lieux les plus proches (nom + url) pour ce tag
+              if (name) {
+                const list = s.pois[tag] || (s.pois[tag] = []);
+                if (list.length < TOP_POIS || dist < list[list.length - 1].dist) {
+                  // éviter les doublons de nom
+                  if (!list.some(p => p.name === name)) {
+                    list.push({ name, url, dist });
+                    list.sort((a, b) => a.dist - b.dist);
+                    if (list.length > TOP_POIS) list.length = TOP_POIS;
+                  }
+                }
+              }
             }
           }
         }
@@ -144,19 +163,31 @@ async function main() {
     for (const [tag, cfg] of Object.entries(TAG_CONFIG)) {
       const n = s.counts[tag] || 0;
       if (n >= cfg.minCount) {
+        const pois = (s.pois[tag] || []).map(p => ({ name: p.name, url: p.url || undefined }));
+        const names = pois.map(p => p.name);
+        // Raison : nomme les lieux précis quand on les a
+        let reason;
+        if (names.length > 0) {
+          const extra = n - names.length;
+          reason = `À proximité : ${names.join(', ')}` + (extra > 0 ? ` et ${extra} autre${extra > 1 ? 's' : ''}` : '');
+        } else {
+          reason = `${n} ${cfg.noun} recensés à proximité`;
+        }
+        // Source principale : 1er lieu avec lien, sinon le jeu de données DATAtourisme
+        const firstWithUrl = pois.find(p => p.url);
         tags.push({
           label: tag,
-          reason: `${n} ${cfg.noun} recensés à proximité (source DATAtourisme)`,
-          source: DATATOURISME_URL,
-          linkLabel: 'Voir sur DATAtourisme',
+          reason,
+          source: firstWithUrl ? firstWithUrl.url : DATATOURISME_URL,
+          linkLabel: firstWithUrl ? firstWithUrl.name : 'Voir sur DATAtourisme',
           confidence: Math.min(95, 50 + n * 3),
+          pois,
           _count: n,
         });
         stats[tag] = (stats[tag] || 0) + 1;
       }
     }
     if (tags.length > 0) {
-      // Trier par pertinence (count) décroissant, retirer le champ interne
       tags.sort((a, b) => b._count - a._count);
       out[s.uic] = tags.map(({ _count, ...t }) => t);
     }
@@ -167,9 +198,12 @@ async function main() {
 
   // 4. Écrire le fichier généré
   const entries = Object.entries(out).map(([uic, tags]) => {
-    const tagsStr = tags.map(t =>
-      `    { label: '${t.label}', reason: ${JSON.stringify(t.reason)}, source: ${JSON.stringify(t.source)}, linkLabel: ${JSON.stringify(t.linkLabel)}, confidence: ${t.confidence} },`
-    ).join('\n');
+    const tagsStr = tags.map(t => {
+      const poisStr = (t.pois && t.pois.length)
+        ? `, pois: ${JSON.stringify(t.pois)}`
+        : '';
+      return `    { label: '${t.label}', reason: ${JSON.stringify(t.reason)}, source: ${JSON.stringify(t.source)}, linkLabel: ${JSON.stringify(t.linkLabel)}, confidence: ${t.confidence}${poisStr} },`;
+    }).join('\n');
     return `  "${uic}": {\n    tags: [\n${tagsStr}\n    ],\n  },`;
   }).join('\n');
 

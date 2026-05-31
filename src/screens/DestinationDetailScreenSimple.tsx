@@ -253,7 +253,26 @@ export default function DestinationDetailScreen() {
                         {isExpanded && (
                           <View style={[styles.tagEvidence, { borderLeftColor: info.color }]}>
                             <Text style={styles.tagReason}>{tagEvidence.reason}</Text>
-                            {tagEvidence.source ? (
+                            {tagEvidence.pois && tagEvidence.pois.length > 0 ? (
+                              <View style={styles.poiList}>
+                                {tagEvidence.pois.map((poi, i) => (
+                                  poi.url ? (
+                                    <TouchableOpacity
+                                      key={`${poi.name}-${i}`}
+                                      onPress={() => Linking.openURL(poi.url!).catch(() => {})}
+                                    >
+                                      <Text style={[styles.poiLink, { color: info.color }]}>
+                                        • {poi.name} →
+                                      </Text>
+                                    </TouchableOpacity>
+                                  ) : (
+                                    <Text key={`${poi.name}-${i}`} style={styles.poiPlain}>
+                                      • {poi.name}
+                                    </Text>
+                                  )
+                                ))}
+                              </View>
+                            ) : tagEvidence.source ? (
                               <TouchableOpacity
                                 onPress={() => Linking.openURL(tagEvidence.source).catch(() => {})}
                               >
@@ -560,6 +579,19 @@ const styles = StyleSheet.create({
     color: '#9E9E9E',
     fontStyle: 'italic',
     marginTop: 10,
+  },
+  poiList: {
+    gap: 4,
+  },
+  poiLink: {
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  poiPlain: {
+    fontSize: 12,
+    color: '#5F6368',
+    lineHeight: 18,
   },
   tagsSectionTitle: {
     fontSize: 15,

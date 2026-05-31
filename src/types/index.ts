@@ -33,12 +33,18 @@ export const UI_LABELS: CityLabel[] = [
   'kid-friendly',
 ];
 
+export interface TaggedPoi {
+  name: string;   // Nom du lieu (ex: "Zoo de la Flèche")
+  url?: string;   // Lien officiel si disponible
+}
+
 export interface TagEvidence {
   label: CityLabel;
   reason: string;       // ex: "Lac d'Annecy (2 727 ha) à 0,5 km"
   source: string;       // URL cliquable dans l'app
   linkLabel: string;    // Texte du bouton lien
   confidence: number;   // 0-100
+  pois?: TaggedPoi[];   // Lieux précis recensés (DATAtourisme) avec leurs liens
 }
 
 export interface StationData {
