@@ -77,31 +77,6 @@ export default function LabelSelectionModal({
             })}
           </ScrollView>
 
-          {/* AND / OR toggle (visible seulement si ≥2 labels) */}
-          {tempSelected.length >= 2 && (
-            <View style={styles.modeSection}>
-              <Text style={styles.modeLabel}>Résultats :</Text>
-              <View style={styles.modeToggle}>
-                <TouchableOpacity
-                  style={[styles.modeBtn, tempMode === 'OR' && styles.modeBtnActive]}
-                  onPress={() => setTempMode('OR')}
-                >
-                  <Text style={[styles.modeBtnText, tempMode === 'OR' && styles.modeBtnTextActive]}>
-                    Au moins un
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modeBtn, tempMode === 'AND' && styles.modeBtnActive]}
-                  onPress={() => setTempMode('AND')}
-                >
-                  <Text style={[styles.modeBtnText, tempMode === 'AND' && styles.modeBtnTextActive]}>
-                    Tous ces critères
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
           {/* Footer */}
           <View style={styles.footer}>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => onClose(selectedLabels, labelFilterMode)}>
