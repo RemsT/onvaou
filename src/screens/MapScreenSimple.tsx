@@ -149,10 +149,28 @@ export default function MapScreen() {
           ))}
       </MapView>
 
+      {/* Message si aucune destination trouvée (au lieu d'une carte vide) */}
+      {results.length === 0 && (
+        <View style={styles.emptyOverlay} pointerEvents="box-none">
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>Aucune destination trouvée</Text>
+            <Text style={styles.emptyText}>
+              Aucun trajet depuis {fromStation.name} ne correspond à vos critères.
+              Essayez d'augmenter le temps ou le budget, ou d'élargir vos centres d'intérêt.
+            </Text>
+            <TouchableOpacity style={styles.emptyButton} onPress={() => navigation.goBack()}>
+              <Text style={styles.emptyButtonText}>Modifier la recherche</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {/* Bouton pour recentrer la carte */}
-      <TouchableOpacity style={styles.recenterButton} onPress={fitToAllDestinations}>
-        <Text style={styles.recenterIcon}>⊕</Text>
-      </TouchableOpacity>
+      {results.length > 0 && (
+        <TouchableOpacity style={styles.recenterButton} onPress={fitToAllDestinations}>
+          <Text style={styles.recenterIcon}>⊕</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Encadré flottant ancré sur la destination sélectionnée */}
       {selectedResult && cardPosition && (
@@ -192,6 +210,7 @@ export default function MapScreen() {
       )}
 
       {/* Informations en bas — tout l'encadré est cliquable */}
+      {results.length > 0 && (
       <TouchableOpacity
         style={styles.infoCard}
         onPress={() => navigation.navigate('ResultsList', {
@@ -219,6 +238,7 @@ export default function MapScreen() {
           <Text style={styles.infoCardArrow}>›</Text>
         </View>
       </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -357,6 +377,49 @@ const styles = StyleSheet.create({
   infoCardText: {
     fontSize: 13,
     color: '#5F6368',
+  },
+  emptyOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+    maxWidth: 340,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0C3823',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#5F6368',
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  emptyButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  emptyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
   recenterButton: {
     position: 'absolute',

@@ -24,7 +24,7 @@ import { LocalStationService } from '../services/localStationService';
 import { HybridSearchService } from '../services/hybridSearchService';
 import { useGTFSInitialization } from '../hooks/useGTFSInitialization';
 import { DatabaseInitializationScreen } from '../components/DatabaseInitializationScreen';
-import { Station, CityLabel } from '../types';
+import { Station, CityLabel, CITY_LABELS } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import { recentSearchService, RecentSearch } from '../services/recentSearchService';
 
@@ -541,7 +541,7 @@ export default function HomeScreen() {
                   key={label}
                   style={[styles.labelsChip, { borderColor: '#4CAF50', backgroundColor: '#E8F5E9' }]}
                 >
-                  <Text style={styles.labelsChipText}>{label.replace(/-/g, ' ')}</Text>
+                  <Text style={styles.labelsChipText}>{CITY_LABELS[label]?.name || label}</Text>
                 </View>
               ))}
             </View>
