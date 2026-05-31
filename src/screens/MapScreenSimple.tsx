@@ -151,7 +151,7 @@ export default function MapScreen() {
 
       {/* Message si aucune destination trouvée (au lieu d'une carte vide) */}
       {results.length === 0 && (
-        <View style={styles.emptyOverlay} pointerEvents="box-none">
+        <View style={[styles.emptyOverlay, { pointerEvents: 'box-none' }]}>
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>Aucune destination trouvée</Text>
             <Text style={styles.emptyText}>
