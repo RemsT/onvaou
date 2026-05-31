@@ -112,21 +112,23 @@ export const useGTFSInitialization = (): UseGTFSInitializationReturn => {
       });
 
       if (success) {
-        // Sauvegarder le build actuel pour détecter les mises à jour futures
-        await gtfsInitService.saveCurrentAppBuild();
-
-        // Charger les tarifs en arrière-plan
-        tariffService.loadTariffs().catch(err =>
-          console.warn('⚠️ Chargement des tarifs échoué :', err)
-        );
-
-        // Vérifier fraîcheur
-        gtfsInitService.isGTFSStale().then(stale => setIsGTFSStale(stale));
+        // Les assets bundlés sont toujours anciens — télécharger immédiatement
+        // des données fraîches depuis data.sncf.com pour avoir les horaires à jour
+        setProgress({ step: 'download', progress: 0, message: 'Téléchargement des horaires à jour...' });
+        const updated = await gtfsInitService.downloadAndUpdateGTFS((prog) => setProgress(prog));
+        if (updated) {
+          await gtfsInitService.saveCurrentAppBuild();
+          await tariffService.loadTariffs();
+          setIsGTFSStale(false);
+        } else {
+          // Téléchargement échoué (pas de réseau) — on continue avec les assets
+          await gtfsInitService.saveCurrentAppBuild();
+          tariffService.loadTariffs().catch(() => {});
+          setIsGTFSStale(true);
+        }
 
         setIsInitialized(true);
-        setTimeout(() => {
-          setIsInitializing(false);
-        }, 1000);
+        setTimeout(() => setIsInitializing(false), 1000);
       } else {
         throw new Error('Échec de l\'initialisation de la base de données');
       }
