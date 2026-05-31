@@ -245,9 +245,9 @@ const styles = StyleSheet.create({
   },
   redMarker: {
     backgroundColor: '#F44336',
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     borderWidth: 2,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
