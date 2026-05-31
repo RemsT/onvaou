@@ -1,0 +1,73 @@
+name: Renouvellement annuel des tags de gares
+
+on:
+  schedule:
+    - cron: '0 6 1 9 *'   # 1er septembre à 6h UTC (avant saison hiver)
+  workflow_dispatch:        # Déclenchement manuel possible
+
+jobs:
+  update-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tagging script (dry-run preview)
+        run: node scripts/generate-station-labels.js --dry-run
+        env:
+          GEONAMES_USERNAME: ${{ secrets.GEONAMES_USERNAME }}
+
+      - name: Run tagging script (full generation)
+        run: node scripts/generate-station-labels.js
+        env:
+          GEONAMES_USERNAME: ${{ secrets.GEONAMES_USERNAME }}
+
+      - name: Read diff stats from report
+        id: report
+        run: |
+          if [ -f src/data/tagging_report.json ]; then
+            TAGGED=$(jq '.auto_tagged_stations' src/data/tagging_report.json)
+            LOW_CONF=$(jq '.low_confidence | length' src/data/tagging_report.json)
+            echo "tagged=$TAGGED" >> $GITHUB_OUTPUT
+            echo "low_confidence=$LOW_CONF" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: "data: renouvellement annuel tags gares 🏷️"
+          body: |
+            ## Renouvellement automatique des tags de gares
+
+            **Résultats :**
+            - Gares auto-taguées : ${{ steps.report.outputs.tagged }}
+            - Tags à vérifier (low confidence) : ${{ steps.report.outputs.low_confidence }}
+
+            **⚠️ Avant de merger :**
+            1. Consulter `src/data/tagging_report.json` — section `low_confidence`
+            2. Corriger les erreurs dans `scripts/sources/manual_overrides.json` si nécessaire
+            3. Re-générer si des corrections sont apportées
+
+            **Sources utilisées :**
+            - Communes littorales : data.gouv.fr
+            - Altitude : GeoNames API
+            - Lacs : SANDRE Eaufrance
+            - Monuments : Base Mérimée (data.culture.gouv.fr)
+            - Descriptions + catégories : Wikipedia API (fr)
+            - Parcs naturels : data.gouv.fr
+
+            🤖 Généré automatiquement — [Voir le workflow](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          branch: "update/station-labels-auto"
+          commit-message: "data: renouvellement automatique stationLabels"
+          labels: "data,automated"
+          delete-branch: true
