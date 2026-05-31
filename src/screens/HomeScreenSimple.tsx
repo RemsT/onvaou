@@ -34,7 +34,7 @@ export default function HomeScreen() {
 
   const [loading, setLoading] = useState(false);
   const [fromStation, setFromStation] = useState<Station | null>(null);
-  const [enableTimeFilter, setEnableTimeFilter] = useState(true);
+  const [enableTimeFilter, setEnableTimeFilter] = useState(false);
   const [enableBudgetFilter, setEnableBudgetFilter] = useState(false);
   const [maxTime, setMaxTime] = useState<string>('02:00');
   const [maxBudget, setMaxBudget] = useState<string>('30');
@@ -48,7 +48,7 @@ export default function HomeScreen() {
   const [timeRangeStart, setTimeRangeStart] = useState<string>('08:00');
   const [timeRangeEnd, setTimeRangeEnd] = useState<string>('20:00');
   // Checkbox pour les correspondances (par défaut cochée)
-  const [includeTransfers, setIncludeTransfers] = useState(true);
+  const [includeTransfers, setIncludeTransfers] = useState(false);
   const stationInputRef = useRef<any>(null);
 
   // Initialisation de la base de données GTFS
@@ -448,10 +448,10 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={[
             styles.searchButton,
-            (!fromStation || loading || (!enableTimeFilter && !enableBudgetFilter)) && styles.searchButtonDisabled
+            (!fromStation || !selectedDate || loading || (!enableTimeFilter && !enableBudgetFilter)) && styles.searchButtonDisabled
           ]}
           onPress={handleSearch}
-          disabled={loading || !fromStation || (!enableTimeFilter && !enableBudgetFilter)}
+          disabled={loading || !fromStation || !selectedDate || (!enableTimeFilter && !enableBudgetFilter)}
         >
           {loading ? (
             <ActivityIndicator color="#ffffff" />
@@ -462,6 +462,17 @@ export default function HomeScreen() {
             </>
           )}
         </TouchableOpacity>
+
+        {/* Hint when button is disabled */}
+        {!loading && (!fromStation || !selectedDate || (!enableTimeFilter && !enableBudgetFilter)) && (
+          <Text style={styles.searchHint}>
+            {!fromStation
+              ? '← Sélectionnez une gare de départ'
+              : !selectedDate
+              ? '← Sélectionnez une date de départ'
+              : '← Activez au moins un filtre'}
+          </Text>
+        )}
 
         {/* Info Card */}
         {!loading && (
@@ -507,10 +518,8 @@ export default function HomeScreen() {
           onPress={handleResetDatabase}
           disabled={loading}
         >
-          <View style={styles.resetButtonContent}>
-            <Ionicons name="settings-outline" size={15} color="#8E8E93" />
-            <Text style={styles.resetButtonText}>Réinitialiser la base de données</Text>
-          </View>
+          <Ionicons name="settings-outline" size={12} color="#C0C0C0" />
+          <Text style={styles.resetButtonText}>Réinitialiser la base de données</Text>
         </TouchableOpacity>
       </View>
 
@@ -830,22 +839,26 @@ const styles = StyleSheet.create({
 
   // Reset Database Button
   resetButton: {
-    backgroundColor: '#FF9800',
-    borderRadius: 10,
-    padding: 12,
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 10,
-  },
-  resetButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 12,
+    marginBottom: 20,
+    opacity: 0.5,
   },
   resetButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
+    color: '#9E9E9E',
+    fontSize: 11,
+  },
+
+  // Search hint
+  searchHint: {
+    fontSize: 12,
+    color: '#9E9E9E',
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 4,
   },
 
   // Disclaimer affiché pendant la recherche

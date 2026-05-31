@@ -234,7 +234,7 @@ export default function DestinationDetailScreen() {
               <View style={[styles.timelineDot, styles.timelineDotDeparture]} />
               <View style={styles.timelineContent}>
                 <View style={styles.timelineRow}>
-                  <Text style={[styles.timelineTime, styles.timelineTimeDeparture]}>
+                  <Text style={styles.timelineTime}>
                     {departureTime.toLocaleTimeString('fr-FR', {
                       hour: '2-digit',
                       minute: '2-digit',

@@ -341,7 +341,7 @@ export class LocalSearchService {
       timeRangeStart,
       timeRangeEnd,
       maxTransfers,
-      selectedLabels: selectedLabels ? selectedLabels.map(l => l.id).sort() : [],
+      selectedLabels: selectedLabels ? [...selectedLabels].sort() : [],
       searchDate: searchDate ? searchDate.toISOString().slice(0, 10) : undefined,
     });
 
@@ -444,7 +444,7 @@ export class LocalSearchService {
       if (maxTransfers >= 2) {
         debugLog('[LocalSearchService] 🔥 Recherche avec jusqu\'à 2 correspondances (findAllJourneys)...');
 
-        const journeys = await gtfsDbEnhanced.findAllJourneys(fromGTFSId, departureTime, maxTransfers);
+        const journeys = await gtfsDbEnhanced.findAllJourneys(fromGTFSId, '', departureTime, maxTransfers);
         debugLog(`[LocalSearchService] ✅ ${journeys.length} trajets trouvés (maxTransfers=${maxTransfers})`);
 
         for (const journey of journeys) {

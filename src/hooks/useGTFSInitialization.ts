@@ -67,6 +67,23 @@ export const useGTFSInitialization = (): UseGTFSInitializationReturn => {
       const alreadyInitialized = await gtfsInitService.isDatabaseInitialized();
 
       if (alreadyInitialized && !forceReset) {
+        // Vérifier si un nouveau build a été installé
+        const buildChanged = await gtfsInitService.hasAppBuildChanged();
+        if (buildChanged) {
+          console.log('🆕 Nouveau build détecté — mise à jour GTFS...');
+          setIsInitializing(true);
+          setProgress({ step: 'download', progress: 0, message: 'Mise à jour des horaires SNCF...' });
+          const ok = await gtfsInitService.downloadAndUpdateGTFS((prog) => setProgress(prog));
+          if (ok) {
+            await gtfsInitService.saveCurrentAppBuild();
+            await tariffService.loadTariffs();
+            setIsGTFSStale(false);
+          }
+          setIsInitialized(true);
+          setTimeout(() => setIsInitializing(false), 1000);
+          return;
+        }
+
         console.log('✅ Base de données déjà initialisée');
         setProgress({
           step: 'complete',
@@ -95,9 +112,8 @@ export const useGTFSInitialization = (): UseGTFSInitializationReturn => {
       });
 
       if (success) {
-        // Marquer la date du premier import (depuis les assets)
-        // On ne met pas de date ici pour que isGTFSStale revienne vrai
-        // dès que les assets sont trop anciens (pas de timestamp = stale)
+        // Sauvegarder le build actuel pour détecter les mises à jour futures
+        await gtfsInitService.saveCurrentAppBuild();
 
         // Charger les tarifs en arrière-plan
         tariffService.loadTariffs().catch(err =>

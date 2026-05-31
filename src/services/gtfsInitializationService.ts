@@ -10,11 +10,13 @@ import { Asset } from 'expo-asset';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { unzipSync, strFromU8 } from 'fflate';
 import { LocalSearchService } from './localSearchService';
+import Constants from 'expo-constants';
 
 const GTFS_ZIP_URL =
   'https://eu.ftp.opendatasoft.com/sncf/gtfs/export_gtfs_voyages.zip';
 const GTFS_VERSION_KEY = 'gtfs_download_date';
 const GTFS_MAX_AGE_DAYS = 180; // 6 mois
+const APP_BUILD_KEY = 'last_known_app_build';
 
 interface InitializationProgress {
   step: string;
@@ -685,6 +687,22 @@ class GTFSInitializationService {
   }
 
   // ─────────────────────────────────────────────
+  // Gestion de la version de l'application
+  // ─────────────────────────────────────────────
+
+  private getCurrentAppBuild(): string {
+    return `${Constants.nativeAppVersion ?? '0'}.${Constants.nativeBuildVersion ?? '0'}`;
+  }
+
+  async hasAppBuildChanged(): Promise<boolean> {
+    const stored = await AsyncStorage.getItem(APP_BUILD_KEY);
+    return stored !== this.getCurrentAppBuild();
+  }
+
+  async saveCurrentAppBuild(): Promise<void> {
+    await AsyncStorage.setItem(APP_BUILD_KEY, this.getCurrentAppBuild());
+  }
+
   // Gestion de la fraîcheur des données GTFS
   // ─────────────────────────────────────────────
 
