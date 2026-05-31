@@ -6,16 +6,26 @@ import {
   countLabelMatches,
 } from '../src/data/stationLabels';
 
+// IDs réels depuis allStations.ts
+const ID_ANNECY = 3175;
+const ID_CHAMBERY = 2672;
+const ID_GRENOBLE = 1015;
+const ID_MARSEILLE = 3246;
+const ID_NICE = 3324;
+const ID_BORDEAUX = 1878;
+const ID_AJACCIO = 3175; // Ajaccio n'est pas dans la DB SNCF mainline, on utilise Annecy (lacs+montagne)
+const ID_LYON = 2927;
+
 describe('stationLabels — données manuelles', () => {
   describe('getStationLabels', () => {
-    it('retourne les labels d\'Annecy (id=14)', () => {
-      const labels = getStationLabels(14);
+    it('retourne les labels d\'Annecy (id=3175)', () => {
+      const labels = getStationLabels(ID_ANNECY);
       expect(labels).toContain('lacs-rivieres');
       expect(labels).toContain('montagne');
     });
 
-    it('retourne les labels de Bordeaux (id=33)', () => {
-      const labels = getStationLabels(33);
+    it('retourne les labels de Bordeaux (id=1878)', () => {
+      const labels = getStationLabels(ID_BORDEAUX);
       expect(labels).toContain('oenologie');
       expect(labels).toContain('gastronomie');
       expect(labels).toContain('culture-histoire');
@@ -25,12 +35,12 @@ describe('stationLabels — données manuelles', () => {
       expect(getStationLabels(9999)).toEqual([]);
     });
 
-    it('Nice (id=19) a le tag plage-mer', () => {
-      expect(getStationLabels(19)).toContain('plage-mer');
+    it('Nice (id=3324) a le tag plage-mer', () => {
+      expect(getStationLabels(ID_NICE)).toContain('plage-mer');
     });
 
-    it('Chamonix / Grenoble (id=12) a montagne et sports-hiver', () => {
-      const labels = getStationLabels(12);
+    it('Grenoble (id=1015) a montagne et sports-hiver', () => {
+      const labels = getStationLabels(ID_GRENOBLE);
       expect(labels).toContain('montagne');
       expect(labels).toContain('sports-hiver');
     });
@@ -38,18 +48,18 @@ describe('stationLabels — données manuelles', () => {
 
   describe('getStationData', () => {
     it('Annecy a une description', () => {
-      const data = getStationData(14);
+      const data = getStationData(ID_ANNECY);
       expect(data).not.toBeNull();
       expect(data?.description).toContain('Annecy');
     });
 
     it('Annecy a une URL Wikipedia', () => {
-      const data = getStationData(14);
+      const data = getStationData(ID_ANNECY);
       expect(data?.wikipediaUrl).toContain('wikipedia.org');
     });
 
     it('Lac d\'Annecy a une source SANDRE', () => {
-      const data = getStationData(14);
+      const data = getStationData(ID_ANNECY);
       const lacTag = data?.tags.find(t => t.label === 'lacs-rivieres');
       expect(lacTag).toBeDefined();
       expect(lacTag?.source).toContain('sandre');
@@ -62,7 +72,7 @@ describe('stationLabels — données manuelles', () => {
 
   describe('getStationTags', () => {
     it('retourne des TagEvidence avec reason et source', () => {
-      const tags = getStationTags(14); // Annecy
+      const tags = getStationTags(ID_ANNECY);
       expect(tags.length).toBeGreaterThan(0);
       tags.forEach(t => {
         expect(t.reason).toBeTruthy();
@@ -78,29 +88,29 @@ describe('stationLabels — données manuelles', () => {
 });
 
 describe('filterStationsByLabels', () => {
-  const ids = [10, 12, 14, 18, 19, 33, 89]; // Lyon, Grenoble, Annecy, Marseille, Nice, Bordeaux, Ajaccio
+  const ids = [ID_LYON, ID_GRENOBLE, ID_ANNECY, ID_MARSEILLE, ID_NICE, ID_BORDEAUX, ID_CHAMBERY];
 
   describe('mode OR (défaut)', () => {
     it('filtre par plage-mer — retourne les villes côtières', () => {
       const result = filterStationsByLabels(ids, ['plage-mer']);
-      expect(result).toContain(18); // Marseille
-      expect(result).toContain(19); // Nice
-      expect(result).toContain(89); // Ajaccio
-      expect(result).not.toContain(10); // Lyon (pas en bord de mer)
+      expect(result).toContain(ID_MARSEILLE);
+      expect(result).toContain(ID_NICE);
+      expect(result).not.toContain(ID_LYON);
     });
 
     it('filtre par montagne — retourne les villes alpines', () => {
       const result = filterStationsByLabels(ids, ['montagne']);
-      expect(result).toContain(12); // Grenoble
-      expect(result).toContain(14); // Annecy
-      expect(result).not.toContain(18); // Marseille
+      expect(result).toContain(ID_GRENOBLE);
+      expect(result).toContain(ID_ANNECY);
+      expect(result).toContain(ID_CHAMBERY);
+      expect(result).not.toContain(ID_MARSEILLE);
     });
 
     it('filtre OR plage-mer + montagne — union des deux', () => {
       const result = filterStationsByLabels(ids, ['plage-mer', 'montagne'], 'OR');
-      expect(result).toContain(18); // Marseille (plage)
-      expect(result).toContain(12); // Grenoble (montagne)
-      expect(result).not.toContain(10); // Lyon (ni plage ni montagne)
+      expect(result).toContain(ID_MARSEILLE);
+      expect(result).toContain(ID_GRENOBLE);
+      expect(result).not.toContain(ID_LYON);
     });
 
     it('retourne tous les ids si labels vide', () => {
@@ -110,37 +120,37 @@ describe('filterStationsByLabels', () => {
   });
 
   describe('mode AND', () => {
-    it('filtre AND plage-mer + randonnee — uniquement Ajaccio (a les deux)', () => {
-      const result = filterStationsByLabels(ids, ['plage-mer', 'randonnee'], 'AND');
-      expect(result).toContain(89); // Ajaccio a plage ET randonnée (GR20)
-      expect(result).not.toContain(18); // Marseille (plage mais pas randonnée dans ces données)
-      expect(result).not.toContain(12); // Grenoble (randonnée mais pas plage)
+    it('filtre AND lacs-rivieres + montagne — Annecy et Chambéry ont les deux', () => {
+      const result = filterStationsByLabels(ids, ['lacs-rivieres', 'montagne'], 'AND');
+      expect(result).toContain(ID_ANNECY);    // Annecy a lac ET montagne
+      expect(result).toContain(ID_CHAMBERY);  // Chambéry a lac ET montagne
+      expect(result).not.toContain(ID_MARSEILLE); // plage mais pas lac/montagne
     });
 
     it('AND avec un label absent retourne []', () => {
-      const result = filterStationsByLabels([10], ['montagne', 'plage-mer'], 'AND');
-      expect(result).toEqual([]); // Lyon n'a ni montagne ni plage
+      const result = filterStationsByLabels([ID_LYON], ['montagne', 'plage-mer'], 'AND');
+      expect(result).toEqual([]);
     });
   });
 
   it('fonctionne avec des ids string', () => {
-    const result = filterStationsByLabels(['14', '18'], ['plage-mer']);
-    expect(result).toContain('18');
-    expect(result).not.toContain('14');
+    const result = filterStationsByLabels([String(ID_ANNECY), String(ID_MARSEILLE)], ['plage-mer']);
+    expect(result).toContain(String(ID_MARSEILLE));
+    expect(result).not.toContain(String(ID_ANNECY));
   });
 });
 
 describe('countLabelMatches', () => {
-  it('Ajaccio (id=89) a 2 labels parmi [plage-mer, randonnee]', () => {
-    expect(countLabelMatches(89, ['plage-mer', 'randonnee'])).toBe(2);
+  it('Annecy a 2 labels parmi [lacs-rivieres, montagne]', () => {
+    expect(countLabelMatches(ID_ANNECY, ['lacs-rivieres', 'montagne'])).toBe(2);
   });
 
-  it('Lyon (id=10) a 0 match parmi [plage-mer, montagne]', () => {
-    expect(countLabelMatches(10, ['plage-mer', 'montagne'])).toBe(0);
+  it('Lyon a 0 match parmi [plage-mer, montagne]', () => {
+    expect(countLabelMatches(ID_LYON, ['plage-mer', 'montagne'])).toBe(0);
   });
 
-  it('Grenoble (id=12) a 2 match parmi [montagne, sports-hiver, plage-mer]', () => {
-    expect(countLabelMatches(12, ['montagne', 'sports-hiver', 'plage-mer'])).toBe(2);
+  it('Grenoble a 2 match parmi [montagne, sports-hiver, plage-mer]', () => {
+    expect(countLabelMatches(ID_GRENOBLE, ['montagne', 'sports-hiver', 'plage-mer'])).toBe(2);
   });
 
   it('retourne 0 pour une gare inconnue', () => {
@@ -148,7 +158,7 @@ describe('countLabelMatches', () => {
   });
 
   it('fonctionne avec des ids string', () => {
-    expect(countLabelMatches('14', ['lacs-rivieres'])).toBe(1);
+    expect(countLabelMatches(String(ID_ANNECY), ['lacs-rivieres'])).toBe(1);
   });
 });
 
@@ -157,7 +167,6 @@ describe('intégrité des données', () => {
     const { stationLabels } = require('../src/data/stationLabels');
     const { CITY_LABELS } = require('../src/types');
     const validLabels = Object.keys(CITY_LABELS);
-
     Object.entries(stationLabels).forEach(([id, data]: [string, any]) => {
       data.tags.forEach((t: any) => {
         expect(validLabels).toContain(t.label);
@@ -186,8 +195,8 @@ describe('intégrité des données', () => {
     });
   });
 
-  it('le tag lacs-rivieres existe pour Annecy et Chambéry', () => {
-    expect(getStationLabels(14)).toContain('lacs-rivieres'); // Annecy
-    expect(getStationLabels(13)).toContain('lacs-rivieres'); // Chambéry
+  it('le tag lacs-rivieres existe pour Annecy (3175) et Chambéry (2672)', () => {
+    expect(getStationLabels(ID_ANNECY)).toContain('lacs-rivieres');
+    expect(getStationLabels(ID_CHAMBERY)).toContain('lacs-rivieres');
   });
 });
