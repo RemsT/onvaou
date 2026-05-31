@@ -52,6 +52,24 @@ class GTFSInitializationService {
   }
 
   /**
+   * Vérifie que la base contient un dataset complet (et non un export partiel
+   * qui aurait pu remplacer les données embarquées). Seuil : 100k horaires.
+   */
+  async isDatabaseHealthy(): Promise<boolean> {
+    try {
+      const db = await SQLite.openDatabaseAsync(this.dbName, { useNewConnection: true });
+      const row = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) as n FROM stop_times');
+      await db.closeAsync();
+      const count = row?.n || 0;
+      console.log(`🩺 Santé DB : ${count} horaires (stop_times)`);
+      return count >= 100_000;
+    } catch (error) {
+      console.warn('⚠️ Vérification santé DB impossible:', error);
+      return false;
+    }
+  }
+
+  /**
    * Initialise la base de données au premier lancement
    */
   async initializeDatabase(
@@ -802,15 +820,33 @@ class GTFSInitializationService {
       }
 
       const neededFiles = ['stops.txt', 'routes.txt', 'trips.txt', 'stop_times.txt', 'calendar_dates.txt'];
+      let stopTimesLineCount = 0;
       for (const filename of neededFiles) {
         const fileData = files[filename];
         if (fileData) {
           const content = strFromU8(fileData);
+          if (filename === 'stop_times.txt') {
+            // Compter les lignes pour valider la complétude du dataset
+            for (let i = 0; i < content.length; i++) {
+              if (content.charCodeAt(i) === 10) stopTimesLineCount++;
+            }
+          }
           await FileSystem.writeAsStringAsync(`${gtfsDir}${filename}`, content);
           console.log(`✅ ${filename} écrit (${Math.round(content.length / 1024)} KB)`);
         } else {
           console.warn(`⚠️ ${filename} absent du ZIP`);
         }
+      }
+
+      // 3bis. GARDE-FOU : refuser un dataset incomplet qui dégraderait les résultats.
+      // Le GTFS SNCF complet a ~500k lignes de stop_times. En dessous de 100k,
+      // c'est un export partiel/périmé : on conserve les données existantes.
+      const MIN_STOP_TIMES_LINES = 100_000;
+      if (stopTimesLineCount < MIN_STOP_TIMES_LINES) {
+        console.warn(`⚠️ Dataset téléchargé trop petit (${stopTimesLineCount} stop_times < ${MIN_STOP_TIMES_LINES}). Mise à jour annulée, données existantes conservées.`);
+        await FileSystem.deleteAsync(zipPath, { idempotent: true }).catch(() => {});
+        onProgress?.({ step: 'error', progress: 0, message: 'Données SNCF indisponibles, conservation des horaires actuels.' });
+        return false;
       }
 
       // 4. Réinitialisation de la base de données avec les nouveaux fichiers

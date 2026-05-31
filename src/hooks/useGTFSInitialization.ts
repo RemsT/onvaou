@@ -66,43 +66,38 @@ export const useGTFSInitialization = (): UseGTFSInitializationReturn => {
       // Vérifier si déjà initialisée
       const alreadyInitialized = await gtfsInitService.isDatabaseInitialized();
 
+      // Auto-réparation : si la base existe mais est incomplète (ancien dataset
+      // partiel téléchargé par erreur), la recharger depuis les données embarquées.
       if (alreadyInitialized && !forceReset) {
-        // Re-télécharger si nouveau build OU si les données ne couvrent plus les dates actuelles
-        const buildChanged = await gtfsInitService.hasAppBuildChanged();
-        const stale = await gtfsInitService.isGTFSStale();
-        if (buildChanged || stale) {
-          console.log(`🔄 Mise à jour GTFS (build changé: ${buildChanged}, données périmées: ${stale})...`);
+        const healthy = await gtfsInitService.isDatabaseHealthy();
+        if (!healthy) {
+          console.warn('🔧 Base incomplète détectée — rechargement des données embarquées');
           setIsInitializing(true);
-          setProgress({ step: 'download', progress: 0, message: 'Mise à jour des horaires SNCF...' });
-          const ok = await gtfsInitService.downloadAndUpdateGTFS((prog) => setProgress(prog));
+          setProgress({ step: 'reimport', progress: 0, message: 'Réparation des données…' });
+          await gtfsInitService.resetDatabase();
+          const ok = await gtfsInitService.initializeDatabase((prog) => setProgress(prog));
           if (ok) {
             await gtfsInitService.saveCurrentAppBuild();
-            await tariffService.loadTariffs();
-            setIsGTFSStale(false);
+            tariffService.loadTariffs().catch(() => {});
             setIsInitialized(true);
             setTimeout(() => setIsInitializing(false), 1000);
             return;
           }
-          // Échec du téléchargement (hors-ligne) : continuer avec les données existantes
-          console.warn('⚠️ Mise à jour échouée, utilisation des données existantes');
-          setIsGTFSStale(stale);
-          setIsInitialized(true);
-          setIsInitializing(false);
-          tariffService.loadTariffs().catch(() => {});
-          return;
+          throw new Error('Échec de la réparation de la base de données');
         }
+      }
 
-        console.log('✅ Base de données déjà initialisée');
-        setProgress({
-          step: 'complete',
-          progress: 100,
-          message: 'Base de données prête'
-        });
+      if (alreadyInitialized && !forceReset) {
+        // On utilise les données embarquées (complètes : ~500k horaires).
+        // L'auto-téléchargement est désactivé : l'endpoint SNCF public sert
+        // actuellement un dataset partiel (~17k horaires) qui dégraderait les résultats.
+        // La recherche ne filtre pas par date → les horaires théoriques embarqués
+        // restent valides pour n'importe quelle date.
+        console.log('✅ Base de données déjà initialisée (données embarquées)');
+        await gtfsInitService.saveCurrentAppBuild();
+        setProgress({ step: 'complete', progress: 100, message: 'Base de données prête' });
         setIsInitialized(true);
         setIsInitializing(false);
-
-        // Vérifier la fraîcheur des données GTFS (en arrière-plan)
-        gtfsInitService.isGTFSStale().then(stale => setIsGTFSStale(stale));
 
         // Charger les tarifs en arrière-plan (sans bloquer l'UI)
         tariffService.loadTariffs().catch(err =>
@@ -111,8 +106,8 @@ export const useGTFSInitialization = (): UseGTFSInitializationReturn => {
         return;
       }
 
-      // Première initialisation depuis les assets bundlés
-      console.log('🚀 Initialisation de la base de données...');
+      // Première initialisation depuis les assets bundlés (données complètes)
+      console.log('🚀 Initialisation de la base de données depuis les données embarquées...');
       setIsInitializing(true);
 
       const success = await gtfsInitService.initializeDatabase((prog) => {
@@ -120,21 +115,8 @@ export const useGTFSInitialization = (): UseGTFSInitializationReturn => {
       });
 
       if (success) {
-        // Les assets bundlés sont toujours anciens — télécharger immédiatement
-        // des données fraîches depuis data.sncf.com pour avoir les horaires à jour
-        setProgress({ step: 'download', progress: 0, message: 'Téléchargement des horaires à jour...' });
-        const updated = await gtfsInitService.downloadAndUpdateGTFS((prog) => setProgress(prog));
-        if (updated) {
-          await gtfsInitService.saveCurrentAppBuild();
-          await tariffService.loadTariffs();
-          setIsGTFSStale(false);
-        } else {
-          // Téléchargement échoué (pas de réseau) — on continue avec les assets
-          await gtfsInitService.saveCurrentAppBuild();
-          tariffService.loadTariffs().catch(() => {});
-          setIsGTFSStale(true);
-        }
-
+        await gtfsInitService.saveCurrentAppBuild();
+        tariffService.loadTariffs().catch(() => {});
         setIsInitialized(true);
         setTimeout(() => setIsInitializing(false), 1000);
       } else {
