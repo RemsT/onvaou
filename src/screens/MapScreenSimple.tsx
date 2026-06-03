@@ -92,6 +92,16 @@ export default function MapScreen() {
   const handleMarkerPress = async (result: SearchResult, e: any) => {
     e.stopPropagation();
     setSelectedResult(result);
+
+    // Android : utiliser la position réelle du marqueur tapé (nativeEvent.position),
+    // qui ancre l'encadré exactement sur le point. pointForCoordinate peut être
+    // décalé sur Android. iOS conserve pointForCoordinate (comportement inchangé).
+    const pos = e?.nativeEvent?.position;
+    if (Platform.OS === 'android' && pos && typeof pos.x === 'number') {
+      setCardPosition({ x: pos.x, y: pos.y });
+      return;
+    }
+
     if (mapRef.current) {
       const point = await mapRef.current.pointForCoordinate({
         latitude: result.to_station.lat,
