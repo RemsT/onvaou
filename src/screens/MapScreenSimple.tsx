@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Platform,
+  PixelRatio,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -92,22 +93,20 @@ export default function MapScreen() {
   const handleMarkerPress = async (result: SearchResult, e: any) => {
     e.stopPropagation();
     setSelectedResult(result);
-
-    // Android : utiliser la position réelle du marqueur tapé (nativeEvent.position),
-    // qui ancre l'encadré exactement sur le point. pointForCoordinate peut être
-    // décalé sur Android. iOS conserve pointForCoordinate (comportement inchangé).
-    const pos = e?.nativeEvent?.position;
-    if (Platform.OS === 'android' && pos && typeof pos.x === 'number') {
-      setCardPosition({ x: pos.x, y: pos.y });
-      return;
-    }
-
     if (mapRef.current) {
       const point = await mapRef.current.pointForCoordinate({
         latitude: result.to_station.lat,
         longitude: result.to_station.lon,
       });
-      setCardPosition(point);
+      // Android : pointForCoordinate renvoie des pixels PHYSIQUES, alors que la
+      // mise en page utilise des pixels logiques (dp). On divise par la densité.
+      // iOS renvoie déjà des dp → comportement inchangé.
+      if (Platform.OS === 'android') {
+        const r = PixelRatio.get();
+        setCardPosition({ x: point.x / r, y: point.y / r });
+      } else {
+        setCardPosition(point);
+      }
     }
   };
 
@@ -167,20 +166,10 @@ export default function MapScreen() {
               }
               onPress={(e) => handleMarkerPress(result, e)}
             >
-              {Platform.OS === 'android' ? (
-                // Zone tactile élargie (transparente) autour du point sur Android
-                <View style={styles.markerHitArea}>
-                  <View style={[
-                    styles.redMarker,
-                    selectedResult?.to_station.id === result.to_station.id && styles.redMarkerSelected,
-                  ]} />
-                </View>
-              ) : (
-                <View style={[
-                  styles.redMarker,
-                  selectedResult?.to_station.id === result.to_station.id && styles.redMarkerSelected,
-                ]} />
-              )}
+              <View style={[
+                styles.redMarker,
+                selectedResult?.to_station.id === result.to_station.id && styles.redMarkerSelected,
+              ]} />
             </Marker>
           ))}
       </MapView>
@@ -298,13 +287,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 2,
     elevation: 3,
-  },
-  // Zone tactile transparente (Android) pour faciliter le tap sur le petit point
-  markerHitArea: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   redMarker: {
     backgroundColor: '#F44336',
