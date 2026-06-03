@@ -167,10 +167,20 @@ export default function MapScreen() {
               }
               onPress={(e) => handleMarkerPress(result, e)}
             >
-              <View style={[
-                styles.redMarker,
-                selectedResult?.to_station.id === result.to_station.id && styles.redMarkerSelected,
-              ]} />
+              {Platform.OS === 'android' ? (
+                // Zone tactile élargie (transparente) autour du point sur Android
+                <View style={styles.markerHitArea}>
+                  <View style={[
+                    styles.redMarker,
+                    selectedResult?.to_station.id === result.to_station.id && styles.redMarkerSelected,
+                  ]} />
+                </View>
+              ) : (
+                <View style={[
+                  styles.redMarker,
+                  selectedResult?.to_station.id === result.to_station.id && styles.redMarkerSelected,
+                ]} />
+              )}
             </Marker>
           ))}
       </MapView>
@@ -288,6 +298,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 2,
     elevation: 3,
+  },
+  // Zone tactile transparente (Android) pour faciliter le tap sur le petit point
+  markerHitArea: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   redMarker: {
     backgroundColor: '#F44336',
