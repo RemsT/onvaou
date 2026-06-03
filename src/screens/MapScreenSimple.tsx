@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  Platform,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -30,6 +31,17 @@ export default function MapScreen() {
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
   const [cardPosition, setCardPosition] = useState<{ x: number; y: number } | null>(null);
   const [cardHeight, setCardHeight] = useState(70);
+
+  // Android : react-native-maps n'affiche les marqueurs personnalisés que si
+  // tracksViewChanges est vrai au montage (capture de la vue). On l'active
+  // brièvement puis on le coupe pour la performance. iOS n'est pas concerné.
+  const [androidTrackMarkers, setAndroidTrackMarkers] = useState(Platform.OS === 'android');
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    setAndroidTrackMarkers(true);
+    const t = setTimeout(() => setAndroidTrackMarkers(false), 2000);
+    return () => clearTimeout(t);
+  }, [results]);
 
   // Calculer la région initiale pour centrer la carte
   const initialRegion = {
@@ -122,7 +134,7 @@ export default function MapScreen() {
           title={fromStation.name}
           description="Gare de départ"
           anchor={{ x: 0.5, y: 0.5 }}
-          tracksViewChanges={false}
+          tracksViewChanges={Platform.OS === 'android' ? androidTrackMarkers : false}
         >
           <View style={styles.blueMarker} />
         </Marker>
@@ -138,7 +150,11 @@ export default function MapScreen() {
                 longitude: result.to_station.lon,
               }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={selectedResult?.to_station.id === result.to_station.id}
+              tracksViewChanges={
+                Platform.OS === 'android'
+                  ? (androidTrackMarkers || selectedResult?.to_station.id === result.to_station.id)
+                  : selectedResult?.to_station.id === result.to_station.id
+              }
               onPress={(e) => handleMarkerPress(result, e)}
             >
               <View style={[
