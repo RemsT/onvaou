@@ -28,7 +28,12 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.r.s.onvaou"
+      "package": "com.r.s.onvaou",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDAxgAy1GsGJ8kNH1mxQzdL9LpfSuLdGAk"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
