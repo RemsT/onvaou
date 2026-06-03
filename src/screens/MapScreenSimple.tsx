@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Dimensions,
   Platform,
-  PixelRatio,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -94,19 +93,14 @@ export default function MapScreen() {
     e.stopPropagation();
     setSelectedResult(result);
     if (mapRef.current) {
+      // pointForCoordinate renvoie déjà des dp (vérifié sur Android & iOS).
+      // Le décalage venait du recentrage auto de la carte, désormais désactivé
+      // via moveOnMarkerPress={false}.
       const point = await mapRef.current.pointForCoordinate({
         latitude: result.to_station.lat,
         longitude: result.to_station.lon,
       });
-      // Android : pointForCoordinate renvoie des pixels PHYSIQUES, alors que la
-      // mise en page utilise des pixels logiques (dp). On divise par la densité.
-      // iOS renvoie déjà des dp → comportement inchangé.
-      if (Platform.OS === 'android') {
-        const r = PixelRatio.get();
-        setCardPosition({ x: point.x / r, y: point.y / r });
-      } else {
-        setCardPosition(point);
-      }
+      setCardPosition(point);
     }
   };
 
