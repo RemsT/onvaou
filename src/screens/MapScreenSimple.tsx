@@ -129,7 +129,19 @@ export default function MapScreen() {
         ref={mapRef}
         style={styles.map}
         initialRegion={initialRegion}
-        {...(Platform.OS === 'android' ? { moveOnMarkerPress: false } : {})}
+        {...(Platform.OS === 'android'
+          ? {
+              moveOnMarkerPress: false,
+              // Faire disparaître l'encadré quand l'utilisateur bouge/zoome la carte
+              // (isGesture = geste utilisateur, ignore le recadrage automatique).
+              onRegionChange: (_region: any, details?: { isGesture?: boolean }) => {
+                if (details?.isGesture) {
+                  setSelectedResult(null);
+                  setCardPosition(null);
+                }
+              },
+            }
+          : {})}
         onPress={() => { setSelectedResult(null); setCardPosition(null); }}
       >
         {/* Point bleu pour la gare de départ */}
