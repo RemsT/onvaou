@@ -129,7 +129,7 @@ export default function MapScreen() {
         ref={mapRef}
         style={styles.map}
         initialRegion={initialRegion}
-        moveOnMarkerPress={false}
+        {...(Platform.OS === 'android' ? { moveOnMarkerPress: false } : {})}
         onPress={() => { setSelectedResult(null); setCardPosition(null); }}
       >
         {/* Point bleu pour la gare de départ */}
