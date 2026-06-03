@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Platform,
+  PixelRatio,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -92,10 +93,18 @@ export default function MapScreen() {
   const handleMarkerPress = async (result: SearchResult, e: any) => {
     e.stopPropagation();
     setSelectedResult(result);
+
+    // Android : ancrer l'encadré exactement sur le point tapé (nativeEvent.position,
+    // en pixels physiques → /PixelRatio pour des dp). Ça évite le décalage perçu
+    // quand plusieurs marqueurs sont proches. iOS garde pointForCoordinate.
+    const nativePos = e?.nativeEvent?.position;
+    if (Platform.OS === 'android' && nativePos && typeof nativePos.x === 'number') {
+      const r = PixelRatio.get();
+      setCardPosition({ x: nativePos.x / r, y: nativePos.y / r });
+      return;
+    }
+
     if (mapRef.current) {
-      // pointForCoordinate renvoie déjà des dp (vérifié sur Android & iOS).
-      // Le décalage venait du recentrage auto de la carte, désormais désactivé
-      // via moveOnMarkerPress={false}.
       const point = await mapRef.current.pointForCoordinate({
         latitude: result.to_station.lat,
         longitude: result.to_station.lon,
