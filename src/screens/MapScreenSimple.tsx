@@ -100,7 +100,10 @@ export default function MapScreen() {
     const nativePos = e?.nativeEvent?.position;
     if (Platform.OS === 'android' && nativePos && typeof nativePos.x === 'number') {
       const r = PixelRatio.get();
-      setCardPosition({ x: nativePos.x / r, y: nativePos.y / r });
+      // Petit décalage : un peu à gauche et un peu vers le haut
+      const OFFSET_X = 10;
+      const OFFSET_Y = 12;
+      setCardPosition({ x: nativePos.x / r - OFFSET_X, y: nativePos.y / r - OFFSET_Y });
       return;
     }
 
