@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   },
   arrow: {
     fontSize: 24,
-    color: '#E8EAED',
+    color: '#4CAF50',
   },
   destinationDetails: {
     flexDirection: 'row',

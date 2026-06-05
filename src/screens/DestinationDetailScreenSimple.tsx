@@ -68,48 +68,23 @@ export default function DestinationDetailScreen() {
   };
 
   const handleBooking = async () => {
-    const fromStation = destination.from_station;
-    const toStation = destination.to_station;
-
-    // Utiliser l'horaire sélectionné + la date de recherche
     const baseDate = searchDate ? new Date(searchDate) : new Date(destination.departure_time);
-    const timeStr = selectedDepartureHHMM;
-
-    // Format de date: JJ/MM/AAAA
     const day = baseDate.getDate().toString().padStart(2, '0');
     const month = (baseDate.getMonth() + 1).toString().padStart(2, '0');
     const year = baseDate.getFullYear();
-    const dateStr = `${day}/${month}/${year}`;
-
-    const fromName = fromStation ? fromStation.name : '';
-    const toName = toStation.name;
-
-    // Construire le texte à copier: depart de {gare depart}, arrivee a {gare d'arrivee} le {date} a partir de {heure}
-    const textToCopy = `depart de ${fromName}, arrivee a ${toName} le ${dateStr} a partir de ${timeStr}`;
+    const fromName = destination.from_station ? destination.from_station.name : '';
+    const toName = destination.to_station.name;
+    const textToCopy = `depart de ${fromName}, arrivee a ${toName} le ${day}/${month}/${year} a partir de ${selectedDepartureHHMM}`;
 
     try {
       await Clipboard.setStringAsync(textToCopy);
-
-      // Afficher la confirmation et ouvrir SNCF Connect
       Alert.alert(
         'Copié !',
         'SNCF Connect va s\'ouvrir.\nCollez les informations dans la barre de recherche.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              const url = buildSNCFURL();
-              Linking.openURL(url).catch((error) => {
-                console.error('Error opening URL:', error);
-                Alert.alert('Erreur', "Impossible d'ouvrir le lien");
-              });
-            }
-          }
-        ]
+        [{ text: 'OK', onPress: () => Linking.openURL(buildSNCFURL()).catch(console.error) }]
       );
-    } catch (error) {
-      console.error('Error copying to clipboard:', error);
-      Alert.alert('Erreur', 'Impossible de copier dans le presse-papier');
+    } catch {
+      Linking.openURL(buildSNCFURL()).catch(console.error);
     }
   };
 

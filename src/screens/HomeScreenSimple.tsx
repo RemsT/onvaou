@@ -51,6 +51,7 @@ export default function HomeScreen() {
   const [timeRangeEnd, setTimeRangeEnd] = useState<string>('12:00');
   // Checkbox "trajet direct" — non cochée par défaut (correspondances autorisées)
   const [directOnly, setDirectOnly] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const stationInputRef = useRef<any>(null);
 
   // Recherche récente
@@ -81,7 +82,7 @@ export default function HomeScreen() {
     setStationSuggestions([]);
   };
 
-  const handleRelaunch = async (recent: RecentSearch) => {
+  const handleRelaunch = (recent: RecentSearch) => {
     setFromStation(recent.fromStation);
     setEnableTimeFilter(recent.enableTimeFilter);
     setEnableBudgetFilter(recent.enableBudgetFilter);
@@ -125,95 +126,90 @@ export default function HomeScreen() {
     return hours * 60 + minutes;
   };
 
-  const handleSearch = async () => {
-    if (!fromStation) {
-      Alert.alert('Erreur', 'Veuillez sélectionner une gare de départ');
+  const executeSearch = async (p: {
+    fromStation: Station;
+    enableTimeFilter: boolean;
+    enableBudgetFilter: boolean;
+    maxTime: string;
+    maxBudget: string;
+    selectedDate: Date | null;
+    selectedLabels: CityLabel[];
+    labelFilterMode: 'OR' | 'AND';
+    timeRangeStart: string;
+    timeRangeEnd: string;
+    directOnly: boolean;
+  }) => {
+    setErrorMessage(null);
+    if (!validateTimeFormat(p.timeRangeStart) || !validateTimeFormat(p.timeRangeEnd)) {
+      setErrorMessage('Format d\'heure invalide (HH:MM)');
+      return;
+    }
+    if (p.timeRangeStart >= p.timeRangeEnd) {
+      setErrorMessage('L\'heure de début doit être antérieure à l\'heure de fin');
       return;
     }
 
-    if (!enableTimeFilter && !enableBudgetFilter) {
-      Alert.alert('Erreur', 'Veuillez activer au moins un filtre (temps ou budget)');
-      return;
-    }
-
-    // Convert time format HH:mm to minutes
-    const timeValue = enableTimeFilter ? convertTimeToMinutes(maxTime) : undefined;
-    const budgetValue = enableBudgetFilter ? parseFloat(maxBudget) : undefined;
-
-    if (enableTimeFilter && (!validateTimeFormat(maxTime) || timeValue! <= 0)) {
-      Alert.alert('Erreur', 'Veuillez sélectionner un temps valide');
-      return;
-    }
-
-    if (enableBudgetFilter && (isNaN(budgetValue!) || budgetValue! <= 0)) {
-      Alert.alert('Erreur', 'Veuillez sélectionner un budget valide');
-      return;
-    }
-
-    if (!validateTimeFormat(timeRangeStart)) {
-      Alert.alert('Erreur', 'Format d\'heure de début invalide (HH:MM)');
-      return;
-    }
-    if (!validateTimeFormat(timeRangeEnd)) {
-      Alert.alert('Erreur', 'Format d\'heure de fin invalide (HH:MM)');
-      return;
-    }
-    if (timeRangeStart >= timeRangeEnd) {
-      Alert.alert('Erreur', 'L\'heure de début doit être antérieure à l\'heure de fin');
-      return;
-    }
+    const timeValue = p.enableTimeFilter ? convertTimeToMinutes(p.maxTime) : undefined;
+    const budgetValue = p.enableBudgetFilter ? parseFloat(p.maxBudget) : undefined;
+    const searchMode = p.enableTimeFilter && p.enableBudgetFilter ? 'both'
+      : p.enableTimeFilter ? 'time'
+      : p.enableBudgetFilter ? 'budget'
+      : 'time'; // sans filtre = tout afficher
+    const maxTransfers = p.directOnly ? 0 : 1;
 
     setLoading(true);
     try {
-      const searchMode = enableTimeFilter && enableBudgetFilter ? 'both' : enableTimeFilter ? 'time' : 'budget';
-
-      const maxTransfers = directOnly ? 0 : 1;
-
       const results = await HybridSearchService.searchDestinations(
-        fromStation,
+        p.fromStation,
         searchMode,
         timeValue,
         budgetValue,
-        selectedDate || undefined,
-        selectedLabels.length > 0 ? selectedLabels : undefined,
-        timeRangeStart,
-        timeRangeEnd,
+        p.selectedDate || undefined,
+        p.selectedLabels.length > 0 ? p.selectedLabels : undefined,
+        p.timeRangeStart,
+        p.timeRangeEnd,
         maxTransfers,
-        labelFilterMode
+        p.labelFilterMode
       );
 
-      // Filtrer si "trajet direct" coché : exclure les correspondances
-      const filteredResults = directOnly
+      const filteredResults = p.directOnly
         ? results.filter(r => (r.transfers ?? 0) === 0)
         : results;
 
       recentSearchService.save({
-        fromStation,
-        enableTimeFilter,
-        enableBudgetFilter,
-        maxTime,
-        maxBudget,
-        selectedDate: selectedDate ? selectedDate.getTime() : null,
-        selectedLabels,
-        labelFilterMode,
-        timeRangeStart,
-        timeRangeEnd,
-        includeTransfers: directOnly,
+        fromStation: p.fromStation,
+        enableTimeFilter: p.enableTimeFilter,
+        enableBudgetFilter: p.enableBudgetFilter,
+        maxTime: p.maxTime,
+        maxBudget: p.maxBudget,
+        selectedDate: p.selectedDate ? p.selectedDate.getTime() : null,
+        selectedLabels: p.selectedLabels,
+        labelFilterMode: p.labelFilterMode,
+        timeRangeStart: p.timeRangeStart,
+        timeRangeEnd: p.timeRangeEnd,
+        includeTransfers: p.directOnly,
       });
 
       navigation.navigate('MapView', {
-        fromStation,
+        fromStation: p.fromStation,
         results: filteredResults,
         mode: searchMode,
         maxValue: timeValue || budgetValue,
-        searchDate: (selectedDate || new Date()).getTime(),
+        searchDate: (p.selectedDate || new Date()).getTime(),
         maxTransfers,
       });
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de récupérer les destinations');
+      setErrorMessage('Impossible de récupérer les destinations. Réessayez.');
       console.error(error);
     }
     setLoading(false);
+  };
+
+  const handleSearch = () => {
+    if (!fromStation) { setErrorMessage('Sélectionnez une gare de départ'); return; }
+    if (!selectedDate) { setErrorMessage('Sélectionnez une date de départ'); return; }
+    executeSearch({ fromStation, enableTimeFilter, enableBudgetFilter, maxTime, maxBudget,
+      selectedDate, selectedLabels, labelFilterMode, timeRangeStart, timeRangeEnd, directOnly });
   };
 
   const formatDate = (date: Date): string => {
@@ -313,9 +309,12 @@ export default function HomeScreen() {
               <Text style={styles.recentSearchTitle}>Dernière recherche</Text>
               <Text style={styles.recentSearchSummary} numberOfLines={1}>
                 {recentSearch.fromStation.name}
+                {recentSearch.selectedDate ? ` · ${new Date(recentSearch.selectedDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}
+                {recentSearch.timeRangeStart && recentSearch.timeRangeEnd
+                  ? ` · ${recentSearch.timeRangeStart.replace(':', 'h')}→${recentSearch.timeRangeEnd.replace(':', 'h')}`
+                  : ''}
                 {recentSearch.enableTimeFilter ? ` · ${recentSearch.maxTime.replace(':', 'h')} max` : ''}
                 {recentSearch.enableBudgetFilter ? ` · ${recentSearch.maxBudget}€ max` : ''}
-                {recentSearch.selectedDate ? ` · ${new Date(recentSearch.selectedDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}
               </Text>
             </View>
             <Text style={styles.recentSearchAction}>Relancer →</Text>
@@ -549,10 +548,10 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={[
             styles.searchButton,
-            (!fromStation || !selectedDate || loading || (!enableTimeFilter && !enableBudgetFilter)) && styles.searchButtonDisabled
+            (!fromStation || !selectedDate || loading) && styles.searchButtonDisabled
           ]}
           onPress={handleSearch}
-          disabled={loading || !fromStation || !selectedDate || (!enableTimeFilter && !enableBudgetFilter)}
+          disabled={loading || !fromStation || !selectedDate}
         >
           {loading ? (
             <ActivityIndicator color="#ffffff" />
@@ -564,14 +563,17 @@ export default function HomeScreen() {
           )}
         </TouchableOpacity>
 
+        {/* Message d'erreur inline */}
+        {errorMessage && (
+          <Text style={styles.errorMessage}>{errorMessage}</Text>
+        )}
+
         {/* Hint when button is disabled */}
-        {!loading && (!fromStation || !selectedDate || (!enableTimeFilter && !enableBudgetFilter)) && (
+        {!loading && (!fromStation || !selectedDate) && (
           <Text style={styles.searchHint}>
             {!fromStation
               ? '← Sélectionnez une gare de départ'
-              : !selectedDate
-              ? '← Sélectionnez une date de départ'
-              : '← Activez au moins un filtre'}
+              : '← Sélectionnez une date de départ'}
           </Text>
         )}
 
@@ -1053,6 +1055,13 @@ const styles = StyleSheet.create({
     color: '#9E9E9E',
     textAlign: 'center',
     marginTop: 4,
+    marginBottom: 4,
+  },
+  errorMessage: {
+    fontSize: 13,
+    color: '#D32F2F',
+    textAlign: 'center',
+    marginTop: 8,
     marginBottom: 4,
   },
 
