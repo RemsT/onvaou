@@ -95,6 +95,9 @@ export default function ResultsListScreen() {
                 hour: '2-digit',
                 minute: '2-digit',
               })}
+              {item.tripCount != null && item.tripCount > 0
+                ? ` · ${item.tripCount} train${item.tripCount > 1 ? 's' : ''}`
+                : ''}
             </Text>
           </View>
           {item.priceRange && (

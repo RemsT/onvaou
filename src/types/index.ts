@@ -93,6 +93,8 @@ export interface SearchResult {
   route_name?: string;
   route_type?: 'TGV' | 'INTERCITES' | 'TER' | 'RER' | 'AUTRE';
   navitia_data?: any;
+  tripCount?: number;
+  allDepartureTimes?: string[];
 }
 
 export interface Search {

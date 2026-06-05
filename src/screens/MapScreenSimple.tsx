@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,8 @@ import {
   PixelRatio,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigatorSimple';
@@ -83,12 +84,23 @@ export default function MapScreen() {
     return acc;
   }, [] as SearchResult[]);
 
-  // Ajuster le zoom automatiquement au chargement
+  // Ajuster le zoom au chargement initial
   useEffect(() => {
     if (results.length > 0) {
       setTimeout(() => { fitToAllDestinations(); }, 500);
     }
   }, [results, fromStation]);
+
+  // Remettre la vue par défaut quand on revient depuis l'écran détail
+  useFocusEffect(
+    useCallback(() => {
+      setSelectedResult(null);
+      setCardPosition(null);
+      if (results.length > 0) {
+        setTimeout(() => { fitToAllDestinations(); }, 300);
+      }
+    }, [results])
+  );
 
   const handleMarkerPress = async (result: SearchResult, e: any) => {
     e.stopPropagation();
@@ -212,7 +224,7 @@ export default function MapScreen() {
       {/* Bouton pour recentrer la carte */}
       {results.length > 0 && (
         <TouchableOpacity style={styles.recenterButton} onPress={fitToAllDestinations}>
-          <Text style={styles.recenterIcon}>⊕</Text>
+          <Ionicons name="compass-outline" size={24} color="#0C3823" />
         </TouchableOpacity>
       )}
 
@@ -354,6 +366,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#5F6368',
   },
+  selectedCardDep: {
+    fontSize: 11,
+    color: '#4CAF50',
+    fontWeight: '600',
+    marginTop: 2,
+  },
   selectedCardArrow: {
     fontSize: 22,
     color: '#4CAF50',
@@ -482,10 +500,5 @@ const styles = StyleSheet.create({
     elevation: 5,
     borderWidth: 2,
     borderColor: '#E8EAED',
-  },
-  recenterIcon: {
-    fontSize: 28,
-    color: '#0C3823',
-    fontWeight: 'bold',
   },
 });

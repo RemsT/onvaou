@@ -21,12 +21,13 @@ interface TrainConnection {
   duration_minutes: number;
   route_name: string;
   route_type: 'TGV' | 'INTERCITES' | 'TER' | 'RER' | 'AUTRE';
-  transfers?: number; // Nombre de correspondances (0 = direct, 1 = 1 changement, etc.)
-  transferStation?: string; // Nom de la gare de correspondance
-  transferLat?: number; // Coordonnées de la gare de correspondance
-  transferLon?: number; // Coordonnées de la gare de correspondance
-  transferArrival?: string; // Heure d'arrivée à la gare de correspondance
-  transferDeparture?: string; // Heure de départ de la gare de correspondance
+  transfers?: number;
+  transferStation?: string;
+  transferLat?: number;
+  transferLon?: number;
+  transferArrival?: string;
+  transferDeparture?: string;
+  trip_count?: number;
 }
 
 export class LocalSearchService {
@@ -513,7 +514,8 @@ export class LocalSearchService {
               duration_minutes: durationMinutes,
               route_name: conn.route_short_name || conn.route_long_name,
               route_type: this.detectRouteType(conn.route_short_name || conn.route_long_name),
-              transfers: 0, // Direct = 0 correspondances
+              transfers: 0,
+              trip_count: conn.trip_count,
             });
           }
         }
@@ -545,26 +547,6 @@ export class LocalSearchService {
             // Toujours ajouter le trajet avec correspondance s'il n'existe pas
             // OU s'il est plus rapide que le trajet direct existant
             if (!existing) {
-              // Pas de trajet direct vers cette destination, ajouter le trajet avec correspondance
-              bestConnectionByDestination.set(destId, {
-                from_station_id: fromGTFSId,
-                to_station_id: destId,
-                departure_time: journey.departureTime || '08:00',
-                arrival_time: journey.arrivalTime || '10:00',
-                duration_minutes: journey.totalDuration,
-                route_name: '2 trains', // Indique qu'il y a 2 segments
-                route_type: 'TER',
-                transfers: 1, // 1 correspondance
-                transferStation: journey.transferStation,
-                transferLat: journey.transferLat,
-                transferLon: journey.transferLon,
-                // Horaires de correspondance
-                transferArrival: journey.transferArrival,
-                transferDeparture: journey.transferDeparture,
-              });
-              transfersAdded++;
-            } else if (journey.totalDuration < existing.duration_minutes) {
-              // Le trajet avec correspondance est plus rapide, remplacer
               bestConnectionByDestination.set(destId, {
                 from_station_id: fromGTFSId,
                 to_station_id: destId,
@@ -577,9 +559,27 @@ export class LocalSearchService {
                 transferStation: journey.transferStation,
                 transferLat: journey.transferLat,
                 transferLon: journey.transferLon,
-                // Horaires de correspondance
                 transferArrival: journey.transferArrival,
                 transferDeparture: journey.transferDeparture,
+                trip_count: (journey as any).trip_count,
+              });
+              transfersAdded++;
+            } else if (journey.totalDuration < existing.duration_minutes) {
+              bestConnectionByDestination.set(destId, {
+                from_station_id: fromGTFSId,
+                to_station_id: destId,
+                departure_time: journey.departureTime || '08:00',
+                arrival_time: journey.arrivalTime || '10:00',
+                duration_minutes: journey.totalDuration,
+                route_name: '2 trains',
+                route_type: 'TER',
+                transfers: 1,
+                transferStation: journey.transferStation,
+                transferLat: journey.transferLat,
+                transferLon: journey.transferLon,
+                transferArrival: journey.transferArrival,
+                transferDeparture: journey.transferDeparture,
+                trip_count: (journey as any).trip_count,
               });
               transfersReplaced++;
             } else {
@@ -749,12 +749,12 @@ export class LocalSearchService {
           );
         }
 
-        // Utiliser priceRange.max pour le filtre budget (le prix max possible)
-        if (mode === 'budget' && maxBudget && priceEstimate.max > maxBudget) {
+        // Exclure seulement si même le prix minimum dépasse le budget
+        if (mode === 'budget' && maxBudget && priceEstimate.min > maxBudget) {
           filteredPrice++;
           continue;
         }
-        if (mode === 'both' && maxBudget && priceEstimate.max > maxBudget) {
+        if (mode === 'both' && maxBudget && priceEstimate.min > maxBudget) {
           filteredPrice++;
           continue;
         }
@@ -784,6 +784,18 @@ export class LocalSearchService {
       debugLog(`  - Hors plage horaire: ${filteredTimeRange}`);
       debugLog(`  - Durée trop longue: ${filteredDuration} (dont ${filteredDurationWithTransfers} avec correspondances)`);
       debugLog(`  - Prix trop élevé: ${filteredPrice}`);
+
+      // Récupérer tous les horaires de départ (pour la section dépliable dans l'écran détail)
+      let allDeparturesMap = new Map<string, string[]>();
+      try {
+        allDeparturesMap = await gtfsDbEnhanced.getAllDepartureTimesForDestinations(
+          fromGTFSId,
+          departureTime,
+          timeRangeEnd
+        );
+      } catch (e) {
+        debugLog('[LocalSearchService] ⚠️ Impossible de récupérer tous les horaires:', e);
+      }
 
       // Convertir en SearchResult[]
       // OPTIMISATION: Utilise les distances et prix déjà calculés (pas de recalcul)
@@ -821,12 +833,14 @@ export class LocalSearchService {
           arrival_time: arrivalDate.toISOString(),
           route_name: connection.route_name,
           route_type: connection.route_type,
-          transfers: connection.transfers, // Nombre de correspondances
-          transferStation: connection.transferStation, // Gare de correspondance si applicable
-          transferLat: connection.transferLat, // Latitude gare de correspondance
-          transferLon: connection.transferLon, // Longitude gare de correspondance
-          transferArrival: connection.transferArrival, // Heure d'arrivée à la gare de correspondance
-          transferDeparture: connection.transferDeparture, // Heure de départ de la gare de correspondance
+          transfers: connection.transfers,
+          transferStation: connection.transferStation,
+          transferLat: connection.transferLat,
+          transferLon: connection.transferLon,
+          transferArrival: connection.transferArrival,
+          transferDeparture: connection.transferDeparture,
+          tripCount: connection.trip_count,
+          allDepartureTimes: allDeparturesMap.get(connection.to_station_id),
         };
       });
 

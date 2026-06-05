@@ -41,6 +41,7 @@ export interface Connection {
   service_id: string;
   trip_headsign: string;
   nb_stops?: number;
+  trip_count?: number;
 }
 
 export interface JourneyWithTransfer {
@@ -54,6 +55,7 @@ export interface JourneyWithTransfer {
   transferArrival?: string;
   transferDeparture?: string;
   arrivalTime?: string;
+  trip_count?: number;
 }
 
 export interface CalendarService {
@@ -494,19 +496,20 @@ export class GTFSDatabaseServiceEnhanced {
        - (CAST(substr(departure_time,1,2) AS INTEGER)*60 + CAST(substr(departure_time,4,2) AS INTEGER)) + 1440) % 1440
     )`;
 
-    // On garde le trajet le PLUS RAPIDE par destination (pas le premier départ),
-    // sinon un TER lent partant tôt masque un TGV rapide partant plus tard.
+    // On garde le PREMIER DÉPART par destination (plus tôt dans l'intervalle),
+    // avec le compte total de trains disponibles dans la fourchette horaire.
     const query = `
       WITH best_per_dest AS (
         SELECT *,
-          ROW_NUMBER() OVER (PARTITION BY to_stop_id ORDER BY ${durationExpr} ASC, departure_time ASC) as rn
+          ROW_NUMBER() OVER (PARTITION BY to_stop_id ORDER BY departure_time ASC, ${durationExpr} ASC) as rn,
+          COUNT(*) OVER (PARTITION BY to_stop_id) as trip_count
         FROM direct_connections
         WHERE ${innerWhere}
       )
       SELECT trip_id, from_stop_id, from_stop_name, from_lat, from_lon,
              departure_time, to_stop_id, to_stop_name, to_lat, to_lon,
              arrival_time, to_departure_time, nb_stops, route_short_name,
-             route_long_name, service_id, trip_headsign
+             route_long_name, service_id, trip_headsign, trip_count
       FROM best_per_dest
       WHERE rn = 1
       ORDER BY to_stop_id
@@ -542,7 +545,8 @@ export class GTFSDatabaseServiceEnhanced {
     const stopIds = await this.resolveStopIds(fromStopId);
     const ph = stopIds.map(() => '?').join(',');
 
-    // ROW_NUMBER() pour garder le MEILLEUR trajet par destination (durée minimale)
+    // On garde le PREMIER DÉPART par destination (plus tôt dans l'intervalle),
+    // avec le compte total de trajets disponibles dans la fourchette horaire.
     const query = `
       WITH raw_transfers AS (
         SELECT
@@ -580,7 +584,8 @@ export class GTFSDatabaseServiceEnhanced {
       ),
       filtered AS (
         SELECT *,
-          ROW_NUMBER() OVER (PARTITION BY destination_id ORDER BY total_duration_minutes) as rn
+          ROW_NUMBER() OVER (PARTITION BY destination_id ORDER BY departure_time ASC, total_duration_minutes ASC) as rn,
+          COUNT(*) OVER (PARTITION BY destination_id) as trip_count
         FROM raw_transfers
         WHERE transfer_wait_minutes >= 5
           AND transfer_wait_minutes <= ?
@@ -589,7 +594,7 @@ export class GTFSDatabaseServiceEnhanced {
       SELECT destination_id, destination_name, departure_time, transfer_arrival,
              route1, transfer_station, transfer_lat, transfer_lon,
              transfer_departure, arrival_time, route2,
-             transfer_wait_minutes, total_duration_minutes
+             transfer_wait_minutes, total_duration_minutes, trip_count
       FROM filtered
       WHERE rn = 1
       ORDER BY destination_id
@@ -647,13 +652,13 @@ export class GTFSDatabaseServiceEnhanced {
         totalDuration: row.total_duration_minutes,
         transferTime: row.transfer_wait_minutes,
         transferStation: row.transfer_station,
-        transferLat: row.transfer_lat,              // Coordonnées gare de correspondance
-        transferLon: row.transfer_lon,              // Coordonnées gare de correspondance
-        // Horaires détaillés pour affichage
-        departureTime: row.departure_time,           // Heure départ 1er train
-        transferArrival: row.transfer_arrival,       // Heure arrivée gare de correspondance
-        transferDeparture: row.transfer_departure,   // Heure départ gare de correspondance
-        arrivalTime: row.arrival_time                // Heure arrivée finale
+        transferLat: row.transfer_lat,
+        transferLon: row.transfer_lon,
+        departureTime: row.departure_time,
+        transferArrival: row.transfer_arrival,
+        transferDeparture: row.transfer_departure,
+        arrivalTime: row.arrival_time,
+        trip_count: row.trip_count,
       } as any);
     }
 
@@ -1066,6 +1071,43 @@ export class GTFSDatabaseServiceEnhanced {
     }
 
     return filtered;
+  }
+
+  /**
+   * Retourne tous les horaires de départ disponibles dans l'intervalle pour chaque destination.
+   * Utilisé pour afficher la liste dépliable des horaires dans l'écran détail.
+   */
+  async getAllDepartureTimesForDestinations(
+    fromStopId: string,
+    departureTimeMin?: string,
+    departureTimeMax?: string
+  ): Promise<Map<string, string[]>> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    const stopIds = await this.resolveStopIds(fromStopId);
+    const ph = stopIds.map(() => '?').join(',');
+
+    let where = `from_stop_id IN (${ph})`;
+    const params: any[] = [...stopIds];
+    if (departureTimeMin) { where += ' AND departure_time >= ?'; params.push(departureTimeMin); }
+    if (departureTimeMax) { where += ' AND departure_time <= ?'; params.push(departureTimeMax); }
+
+    const rows = await this.db.getAllAsync<{ to_stop_id: string; departure_time: string }>(
+      `SELECT to_stop_id, departure_time FROM direct_connections WHERE ${where} ORDER BY to_stop_id ASC, departure_time ASC`,
+      params
+    );
+
+    const result = new Map<string, string[]>();
+    for (const row of rows) {
+      const hhmm = row.departure_time.substring(0, 5);
+      const list = result.get(row.to_stop_id);
+      if (list) {
+        if (list[list.length - 1] !== hhmm) list.push(hhmm);
+      } else {
+        result.set(row.to_stop_id, [hhmm]);
+      }
+    }
+    return result;
   }
 }
 

@@ -324,7 +324,7 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
       <View style={styles.timeRangePickerContainer}>
         {/* Heure de début */}
         <View style={styles.wheelPickerSection}>
-          <Text style={styles.wheelPickerLabel}>Heure de début</Text>
+          <Text style={styles.wheelPickerLabel}>De</Text>
           <View style={styles.wheelPickerWrapper}>
             <ScrollView
               ref={scrollViewStartRef}
@@ -371,7 +371,7 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
 
         {/* Heure de fin */}
         <View style={styles.wheelPickerSection}>
-          <Text style={styles.wheelPickerLabel}>Heure de fin</Text>
+          <Text style={styles.wheelPickerLabel}>À</Text>
           <View style={styles.wheelPickerWrapper}>
             <ScrollView
               ref={scrollViewEndRef}
@@ -426,16 +426,9 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
       {/* Bouton principal */}
       {value ? (
         <View style={styles.selectedDateTimeCard}>
-          <View style={styles.dateTimeInfo}>
-            <View style={styles.dateTimeRow}>
-              <Text style={styles.dateTimeLabel}>Date:</Text>
-              <Text style={styles.dateTimeValue}>{formatDate(value)}</Text>
-            </View>
-            <View style={styles.dateTimeRow}>
-              <Text style={styles.dateTimeLabel}>Intervalle:</Text>
-              <Text style={styles.dateTimeValue}>{formatTimeRange(timeRangeStart)} - {formatTimeRange(timeRangeEnd)}</Text>
-            </View>
-          </View>
+          <Text style={styles.dateTimeCompact}>
+            {formatDate(value)} · {formatTimeRange(timeRangeStart)}→{formatTimeRange(timeRangeEnd)}
+          </Text>
           <TouchableOpacity
             onPress={openModal}
             style={styles.modifyButton}
@@ -451,7 +444,7 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
           activeOpacity={0.7}
           disabled={disabled}
         >
-          <Text style={styles.emptyButtonText}>Sélectionner une date et un intervalle</Text>
+          <Text style={styles.emptyButtonText}>Sélectionner une date et l'heure de départ</Text>
         </TouchableOpacity>
       )}
 
@@ -505,7 +498,7 @@ const CustomDateTimePicker: React.FC<DateTimePickerProps> = ({
                   onPress={() => setEditingMode('timeRange')}
                 >
                   <View style={styles.previewTextContainer}>
-                    <Text style={styles.previewLabel}>Intervalle de temps</Text>
+                    <Text style={styles.previewLabel}>Heure de départ</Text>
                     <Text style={styles.previewValue}>
                       {isTimeRangeValid()
                         ? `${formatTimeRange(tempTimeRangeStart)} - ${formatTimeRange(tempTimeRangeEnd)}`
@@ -563,27 +556,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#E8F5E9',
     borderRadius: 12,
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderWidth: 2,
     borderColor: '#4CAF50',
   },
-  dateTimeInfo: {
+  dateTimeCompact: {
     flex: 1,
-  },
-  dateTimeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  dateTimeLabel: {
-    fontSize: 13,
-    color: '#5F6368',
-    fontWeight: '600',
-    marginRight: 6,
-    width: 78,
-  },
-  dateTimeValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#0C3823',
   },

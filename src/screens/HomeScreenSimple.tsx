@@ -48,9 +48,9 @@ export default function HomeScreen() {
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
   const [showBudgetPickerModal, setShowBudgetPickerModal] = useState(false);
   const [timeRangeStart, setTimeRangeStart] = useState<string>('08:00');
-  const [timeRangeEnd, setTimeRangeEnd] = useState<string>('20:00');
-  // Checkbox pour les correspondances (par défaut cochée)
-  const [includeTransfers, setIncludeTransfers] = useState(false);
+  const [timeRangeEnd, setTimeRangeEnd] = useState<string>('12:00');
+  // Checkbox "trajet direct" — non cochée par défaut (correspondances autorisées)
+  const [directOnly, setDirectOnly] = useState(false);
   const stationInputRef = useRef<any>(null);
 
   // Recherche récente
@@ -92,7 +92,7 @@ export default function HomeScreen() {
     setLabelFilterMode(recent.labelFilterMode ?? 'OR');
     setTimeRangeStart(recent.timeRangeStart);
     setTimeRangeEnd(recent.timeRangeEnd);
-    setIncludeTransfers(recent.includeTransfers);
+    setDirectOnly(recent.includeTransfers ?? false);
   };
 
   const handleLabelModalClose = (labels: CityLabel[], mode: 'OR' | 'AND') => {
@@ -167,7 +167,7 @@ export default function HomeScreen() {
     try {
       const searchMode = enableTimeFilter && enableBudgetFilter ? 'both' : enableTimeFilter ? 'time' : 'budget';
 
-      const maxTransfers = includeTransfers ? 1 : 0;
+      const maxTransfers = directOnly ? 0 : 1;
 
       const results = await HybridSearchService.searchDestinations(
         fromStation,
@@ -182,15 +182,10 @@ export default function HomeScreen() {
         labelFilterMode
       );
 
-      // Filtrer les résultats selon les checkboxes de correspondances
-      const filteredResults = results.filter((result) => {
-        const transfers = result.transfers ?? 0; // 0 si undefined
-
-        // Si includeTransfers est coché: afficher tout (direct + correspondances)
-        // Si non coché: afficher uniquement les trajets directs
-        if (includeTransfers) return true;
-        return transfers === 0;
-      });
+      // Filtrer si "trajet direct" coché : exclure les correspondances
+      const filteredResults = directOnly
+        ? results.filter(r => (r.transfers ?? 0) === 0)
+        : results;
 
       recentSearchService.save({
         fromStation,
@@ -203,7 +198,7 @@ export default function HomeScreen() {
         labelFilterMode,
         timeRangeStart,
         timeRangeEnd,
-        includeTransfers,
+        includeTransfers: directOnly,
       });
 
       navigation.navigate('MapView', {
@@ -477,27 +472,28 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {/* Correspondances */}
+          {/* Trajet direct */}
           <View
             style={[
               styles.filterRow,
+              directOnly && styles.filterRowActive,
               loading && styles.filterRowDisabled,
             ]}
           >
             <TouchableOpacity
               style={styles.filterLeftSection}
-              onPress={() => setIncludeTransfers(!includeTransfers)}
+              onPress={() => setDirectOnly(v => !v)}
               activeOpacity={0.7}
               disabled={loading}
             >
               <View style={[
                 styles.customCheckbox,
-                includeTransfers && styles.customCheckboxActive
+                directOnly && styles.customCheckboxActive
               ]}>
-                {includeTransfers && <Text style={styles.checkmark}>✓</Text>}
+                {directOnly && <Text style={styles.checkmark}>✓</Text>}
               </View>
               <View style={styles.filterTextContainer}>
-                <Text style={styles.filterLabel}>Correspondances</Text>
+                <Text style={styles.filterLabel}>Trajet direct</Text>
               </View>
             </TouchableOpacity>
           </View>

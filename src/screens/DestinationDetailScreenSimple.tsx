@@ -31,6 +31,11 @@ export default function DestinationDetailScreen() {
   const { destination, searchDate, mapParams } = route.params;
   const [mapReady, setMapReady] = useState(false);
   const [expandedTag, setExpandedTag] = useState<CityLabel | null>(null);
+  const [showAllDepartures, setShowAllDepartures] = useState(false);
+  const [selectedDepartureHHMM, setSelectedDepartureHHMM] = useState<string>(
+    destination.allDepartureTimes?.[0] ??
+    new Date(destination.departure_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false })
+  );
 
   const numericDestId = typeof destination.to_station_id === 'number'
     ? destination.to_station_id
@@ -41,19 +46,15 @@ export default function DestinationDetailScreen() {
    * Construit l'URL SNCF Connect avec les paramètres pré-remplis
    */
   const buildSNCFURL = (): string => {
-    const departureTime = new Date(destination.departure_time);
+    const baseDate = searchDate ? new Date(searchDate) : new Date(destination.departure_time);
     const fromStation = destination.from_station;
     const toStation = destination.to_station;
 
     // Format de date: YYYY-MM-DD
-    const dateStr = departureTime.toISOString().split('T')[0];
+    const dateStr = baseDate.toISOString().split('T')[0];
 
-    // Format de l'heure: HH:MM
-    const timeStr = departureTime.toLocaleTimeString('fr-FR', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
+    // Utiliser l'horaire sélectionné par l'utilisateur (HH:MM)
+    const timeStr = selectedDepartureHHMM;
 
     const baseUrl = 'https://www.sncf-connect.com/app/home/search';
     const fromName = fromStation ? encodeURIComponent(fromStation.name) : '';
@@ -70,17 +71,14 @@ export default function DestinationDetailScreen() {
     const fromStation = destination.from_station;
     const toStation = destination.to_station;
 
-    // Utiliser la date et l'heure du train
-    const trainDepartureTime = new Date(destination.departure_time);
-
-    // Arrondir à l'heure inférieure
-    const roundedHour = trainDepartureTime.getHours();
-    const timeStr = `${roundedHour.toString().padStart(2, '0')}:00`;
+    // Utiliser l'horaire sélectionné + la date de recherche
+    const baseDate = searchDate ? new Date(searchDate) : new Date(destination.departure_time);
+    const timeStr = selectedDepartureHHMM;
 
     // Format de date: JJ/MM/AAAA
-    const day = trainDepartureTime.getDate().toString().padStart(2, '0');
-    const month = (trainDepartureTime.getMonth() + 1).toString().padStart(2, '0');
-    const year = trainDepartureTime.getFullYear();
+    const day = baseDate.getDate().toString().padStart(2, '0');
+    const month = (baseDate.getMonth() + 1).toString().padStart(2, '0');
+    const year = baseDate.getFullYear();
     const dateStr = `${day}/${month}/${year}`;
 
     const fromName = fromStation ? fromStation.name : '';
@@ -169,11 +167,38 @@ export default function DestinationDetailScreen() {
     };
   };
 
-  // Utiliser directement les timestamps ISO des horaires
-  const departureTime = new Date(destination.departure_time);
-  const arrivalTime = destination.arrival_time
+  // Convertit "HH:MM" en minutes depuis minuit
+  const toMinutes = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    return h * 60 + m;
+  };
+  // Ajoute un delta en minutes à "HH:MM" et retourne "HH:MM" (gère le passage minuit)
+  const addMinutes = (hhmm: string, delta: number): string => {
+    const total = ((toMinutes(hhmm) + delta) % 1440 + 1440) % 1440;
+    return `${Math.floor(total / 60).toString().padStart(2, '0')}:${(total % 60).toString().padStart(2, '0')}`;
+  };
+
+  // Horaire de départ d'origine (HH:MM) pour calculer le delta
+  const originalDepHHMM = new Date(destination.departure_time)
+    .toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const delta = toMinutes(selectedDepartureHHMM) - toMinutes(originalDepHHMM);
+
+  // Recalculer tous les horaires selon le départ sélectionné
+  const originalArrivalHHMM = (destination.arrival_time
     ? new Date(destination.arrival_time)
-    : new Date(departureTime.getTime() + destination.duration * 60000);
+    : new Date(new Date(destination.departure_time).getTime() + destination.duration * 60000)
+  ).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+  const selectedArrivalHHMM = addMinutes(originalArrivalHHMM, delta);
+  const selectedTransferArrivalHHMM = destination.transferArrival
+    ? addMinutes(destination.transferArrival.slice(0, 5), delta)
+    : undefined;
+  const selectedTransferDepartureHHMM = destination.transferDeparture
+    ? addMinutes(destination.transferDeparture.slice(0, 5), delta)
+    : undefined;
+
+  // Date de référence pour l'affichage (inchangée)
+  const referenceDate = new Date(destination.departure_time);
 
   return (
     <ScrollView style={styles.container}>
@@ -318,10 +343,43 @@ export default function DestinationDetailScreen() {
           </View>
         </View>
 
-        {/* Horaires */}
+        {/* Départs dans la plage horaire — AVANT la timeline */}
+        {destination.allDepartureTimes && destination.allDepartureTimes.length > 0 && (
+          <View style={styles.section}>
+            <TouchableOpacity
+              style={styles.departureSectionHeader}
+              onPress={() => setShowAllDepartures(v => !v)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.departureSectionTitle}>
+                {destination.allDepartureTimes.length} départ{destination.allDepartureTimes.length > 1 ? 's' : ''} dans la plage horaire sélectionnée
+              </Text>
+              <Text style={styles.departureChevron}>{showAllDepartures ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+            {showAllDepartures && (
+              <View style={styles.departureChips}>
+                {destination.allDepartureTimes.map((t, i) => {
+                  const isSelected = t === selectedDepartureHHMM;
+                  return (
+                    <TouchableOpacity
+                      key={i}
+                      style={[styles.departureChip, isSelected && styles.departureChipFirst]}
+                      onPress={() => setSelectedDepartureHHMM(t)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.departureChipText, isSelected && styles.departureChipTextFirst]}>{t}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Horaires — timeline mise à jour selon le départ sélectionné */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
-            Horaires pour le {departureTime.toLocaleDateString('fr-FR', {
+            Horaires pour le {referenceDate.toLocaleDateString('fr-FR', {
               weekday: 'long',
               day: 'numeric',
               month: 'long'
@@ -333,12 +391,7 @@ export default function DestinationDetailScreen() {
               <View style={[styles.timelineDot, styles.timelineDotDeparture]} />
               <View style={styles.timelineContent}>
                 <View style={styles.timelineRow}>
-                  <Text style={styles.timelineTime}>
-                    {departureTime.toLocaleTimeString('fr-FR', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </Text>
+                  <Text style={styles.timelineTime}>{selectedDepartureHHMM}</Text>
                   {destination.from_station && (
                     <Text style={styles.timelineStationBold}>
                       {destination.from_station.name}
@@ -358,19 +411,15 @@ export default function DestinationDetailScreen() {
                   <View style={[styles.timelineDot, styles.timelineDotTransfer]} />
                   <View style={styles.timelineContent}>
                     <View style={styles.timelineRow}>
-                      {destination.transferArrival && (
-                        <Text style={styles.timelineTime}>
-                          {destination.transferArrival.slice(0, 5)}
-                        </Text>
+                      {selectedTransferArrivalHHMM && (
+                        <Text style={styles.timelineTime}>{selectedTransferArrivalHHMM}</Text>
                       )}
                       <Text style={styles.timelineStationBold}>
                         {destination.transferStation}
                       </Text>
                     </View>
-                    {destination.transferArrival && destination.transferDeparture && (() => {
-                      const [arrH, arrM] = destination.transferArrival.split(':').map(Number);
-                      const [depH, depM] = destination.transferDeparture.split(':').map(Number);
-                      const waitMinutes = (depH * 60 + depM) - (arrH * 60 + arrM);
+                    {selectedTransferArrivalHHMM && selectedTransferDepartureHHMM && (() => {
+                      const waitMinutes = toMinutes(selectedTransferDepartureHHMM) - toMinutes(selectedTransferArrivalHHMM);
                       const waitHours = Math.floor(waitMinutes / 60);
                       const waitMins = waitMinutes % 60;
                       return (
@@ -387,10 +436,8 @@ export default function DestinationDetailScreen() {
                   <View style={[styles.timelineDot, styles.timelineDotTransfer]} />
                   <View style={styles.timelineContent}>
                     <View style={styles.timelineRow}>
-                      {destination.transferDeparture && (
-                        <Text style={styles.timelineTime}>
-                          {destination.transferDeparture.slice(0, 5)}
-                        </Text>
+                      {selectedTransferDepartureHHMM && (
+                        <Text style={styles.timelineTime}>{selectedTransferDepartureHHMM}</Text>
                       )}
                       <Text style={styles.timelineStationBold}>
                         {destination.transferStation}
@@ -407,12 +454,7 @@ export default function DestinationDetailScreen() {
               <View style={[styles.timelineDot, styles.timelineDotArrival]} />
               <View style={styles.timelineContent}>
                 <View style={styles.timelineRow}>
-                  <Text style={styles.timelineTime}>
-                    {arrivalTime.toLocaleTimeString('fr-FR', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </Text>
+                  <Text style={styles.timelineTime}>{selectedArrivalHHMM}</Text>
                   <Text style={styles.timelineStationBold}>
                     {destination.to_station.real_name || destination.to_station.name}
                   </Text>
@@ -765,6 +807,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     color: '#0C3823',
+  },
+  departureSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+  },
+  departureSectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#0C3823',
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+  departureChevron: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  departureChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingTop: 8,
+  },
+  departureChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F1',
+    borderWidth: 1,
+    borderColor: '#D0E8D0',
+  },
+  departureChipFirst: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  departureChipText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#0C3823',
+  },
+  departureChipTextFirst: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   bookingButton: {
     backgroundColor: '#4CAF50',
