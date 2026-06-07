@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,12 @@ import {
   TouchableOpacity,
   Linking,
   Alert,
+  Share,
   Image,
+  Platform,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
@@ -29,7 +32,14 @@ export default function DestinationDetailScreen() {
   const route = useRoute<DestinationDetailRouteProp>();
   const navigation = useNavigation<DestinationDetailNavigationProp>();
   const { destination, searchDate, mapParams } = route.params;
-  const [mapReady, setMapReady] = useState(false);
+  // Android : react-native-maps n'affiche les marqueurs personnalisés que si
+  // tracksViewChanges capture la vue. Un timer fixe (2s) ne suffit pas : si les
+  // tuiles de la carte mettent plus longtemps à charger, le marqueur n'est pas
+  // encore capturé → invisible. Comme cette mini-carte n'a que 2-3 marqueurs
+  // statiques, on laisse tracksViewChanges actif en permanence sur Android
+  // (coût négligeable, fiabilité garantie). iOS n'en a pas besoin.
+  const trackMarkers = Platform.OS === 'android';
+  const mapRef = useRef<MapView>(null);
   const [expandedTag, setExpandedTag] = useState<CityLabel | null>(null);
   const [showAllDepartures, setShowAllDepartures] = useState(false);
   const [selectedDepartureHHMM, setSelectedDepartureHHMM] = useState<string>(
@@ -88,15 +98,17 @@ export default function DestinationDetailScreen() {
     }
   };
 
+  const departureStation = destination.from_station ?? mapParams?.fromStation ?? null;
+
   // Calculer la région de la carte pour afficher tous les points
   const getMapRegion = () => {
     const points = [];
 
     // Ajouter la gare de départ
-    if (destination.from_station) {
+    if (departureStation) {
       points.push({
-        lat: destination.from_station.lat,
-        lon: destination.from_station.lon,
+        lat: departureStation.lat,
+        lon: departureStation.lon,
       });
     }
 
@@ -142,6 +154,32 @@ export default function DestinationDetailScreen() {
     };
   };
 
+  // Cadre la carte sur tous les points (départ + correspondance + arrivée) avec
+  // une marge, pour qu'ils soient tous visibles quel que soit l'éloignement.
+  const fitToPoints = () => {
+    const coords: { latitude: number; longitude: number }[] = [];
+    if (departureStation) {
+      coords.push({ latitude: departureStation.lat, longitude: departureStation.lon });
+    }
+    if (destination.transferLat && destination.transferLon) {
+      coords.push({ latitude: destination.transferLat, longitude: destination.transferLon });
+    }
+    coords.push({ latitude: destination.to_station.lat, longitude: destination.to_station.lon });
+
+    if (coords.length === 1) {
+      mapRef.current?.animateToRegion({
+        ...coords[0],
+        latitudeDelta: 0.2,
+        longitudeDelta: 0.2,
+      }, 300);
+      return;
+    }
+    mapRef.current?.fitToCoordinates(coords, {
+      edgePadding: { top: 60, right: 60, bottom: 60, left: 60 },
+      animated: false,
+    });
+  };
+
   // Convertit "HH:MM" en minutes depuis minuit
   const toMinutes = (hhmm: string) => {
     const [h, m] = hhmm.split(':').map(Number);
@@ -183,26 +221,41 @@ export default function DestinationDetailScreen() {
           <Text style={styles.stationName}>
             {destination.to_station.real_name || destination.to_station.name}
           </Text>
-          <TouchableOpacity
-            style={styles.mapButton}
-            onPress={() => {
-              if (mapParams) {
-                navigation.navigate('MapView', {
-                  fromStation: mapParams.fromStation,
-                  results: mapParams.results,
-                  mode: mapParams.mode,
-                  maxValue: mapParams.maxValue,
-                  searchDate,
-                  maxTransfers: mapParams.maxTransfers,
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.mapButton}
+              onPress={() => {
+                if (mapParams) {
+                  navigation.navigate('MapView', {
+                    fromStation: mapParams.fromStation,
+                    results: mapParams.results,
+                    mode: mapParams.mode,
+                    maxValue: mapParams.maxValue,
+                    searchDate,
+                    maxTransfers: mapParams.maxTransfers,
+                  });
+                } else {
+                  navigation.goBack();
+                }
+              }}
+            >
+              <Ionicons name="map-outline" size={16} color="#4CAF50" />
+              <Text style={styles.mapButtonText}>Carte des destinations</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={() => {
+                const name = destination.to_station.real_name || destination.to_station.name;
+                const from = destination.from_station?.name ?? '';
+                const dur = `${Math.floor(destination.duration / 60)}h${destination.duration % 60 > 0 ? `${destination.duration % 60}min` : ''}`;
+                Share.share({
+                  message: `Découvrez ${name} en train depuis ${from} (${dur}) 🚂 — réservez sur SNCF Connect`,
                 });
-              } else {
-                navigation.goBack();
-              }
-            }}
-          >
-            <Ionicons name="map-outline" size={16} color="#4CAF50" />
-            <Text style={styles.mapButtonText}>Carte des destinations</Text>
-          </TouchableOpacity>
+              }}
+            >
+              <Ionicons name="share-outline" size={18} color="#5F6368" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* À propos + Wikipedia */}
@@ -288,7 +341,7 @@ export default function DestinationDetailScreen() {
                   })}
                 </View>
                 <Text style={styles.tagsAttribution}>
-                  Tags générés à partir de DATAtourisme (data.gouv.fr) et de sources officielles
+                  Source : DATAtourisme (data.gouv.fr)
                 </Text>
               </View>
             )}
@@ -318,8 +371,8 @@ export default function DestinationDetailScreen() {
           </View>
         </View>
 
-        {/* Départs dans la plage horaire — AVANT la timeline */}
-        {destination.allDepartureTimes && destination.allDepartureTimes.length > 0 && (
+        {/* Départs dans la plage horaire — AVANT la timeline (uniquement si ≥ 2 horaires) */}
+        {destination.allDepartureTimes && destination.allDepartureTimes.length >= 2 && (
           <View style={styles.section}>
             <TouchableOpacity
               style={styles.departureSectionHeader}
@@ -339,7 +392,7 @@ export default function DestinationDetailScreen() {
                     <TouchableOpacity
                       key={i}
                       style={[styles.departureChip, isSelected && styles.departureChipFirst]}
-                      onPress={() => setSelectedDepartureHHMM(t)}
+                      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedDepartureHHMM(t); }}
                       activeOpacity={0.7}
                     >
                       <Text style={[styles.departureChipText, isSelected && styles.departureChipTextFirst]}>{t}</Text>
@@ -457,26 +510,26 @@ export default function DestinationDetailScreen() {
           <Text style={styles.sectionTitle}>Localisation</Text>
           <View style={styles.mapContainer}>
             <MapView
+              ref={mapRef}
               provider={PROVIDER_DEFAULT}
               style={styles.map}
               initialRegion={getMapRegion()}
-              onMapReady={() => setMapReady(true)}
+              onMapReady={fitToPoints}
               scrollEnabled={true}
               zoomEnabled={true}
               pitchEnabled={false}
               rotateEnabled={true}
             >
-              {mapReady && (
-                <>
-                  {/* Gare de départ - Bleu */}
-                  {destination.from_station && (
+              {/* Gare de départ - Bleu */}
+                  {departureStation && (
                     <Marker
                       coordinate={{
-                        latitude: destination.from_station.lat,
-                        longitude: destination.from_station.lon,
+                        latitude: departureStation.lat,
+                        longitude: departureStation.lon,
                       }}
-                      title={destination.from_station.name}
+                      title={departureStation.name}
                       anchor={{ x: 0.5, y: 0.5 }}
+                      tracksViewChanges={trackMarkers}
                     >
                       <View style={styles.blueMarker} />
                     </Marker>
@@ -491,6 +544,7 @@ export default function DestinationDetailScreen() {
                       }}
                       title={destination.transferStation}
                       anchor={{ x: 0.5, y: 0.5 }}
+                      tracksViewChanges={trackMarkers}
                     >
                       <View style={styles.orangeMarker} />
                     </Marker>
@@ -504,12 +558,29 @@ export default function DestinationDetailScreen() {
                     }}
                     title={destination.to_station.real_name || destination.to_station.name}
                     anchor={{ x: 0.5, y: 0.5 }}
+                    tracksViewChanges={trackMarkers}
                   >
                     <View style={styles.redMarker} />
                   </Marker>
-                </>
-              )}
             </MapView>
+          </View>
+
+          {/* Légende */}
+          <View style={styles.mapLegend}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#2196F3' }]} />
+              <Text style={styles.legendText}>Départ</Text>
+            </View>
+            {destination.transfers !== undefined && destination.transfers > 0 && destination.transferLat && destination.transferLon && (
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#FF9800' }]} />
+                <Text style={styles.legendText}>Correspondance</Text>
+              </View>
+            )}
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: '#F44336' }]} />
+              <Text style={styles.legendText}>Arrivée</Text>
+            </View>
           </View>
         </View>
 
@@ -540,9 +611,21 @@ const styles = StyleSheet.create({
   stationName: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#0C3823',
     textAlign: 'center',
     marginBottom: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  shareButton: {
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E8EAED',
   },
   mapButton: {
     flexDirection: 'row',
@@ -572,7 +655,7 @@ const styles = StyleSheet.create({
   },
   cityDescription: {
     fontSize: 13,
-    color: '#444',
+    color: '#5F6368',
     lineHeight: 20,
     marginBottom: 8,
   },
@@ -592,7 +675,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   tagsAttribution: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#9E9E9E',
     fontStyle: 'italic',
     marginTop: 10,
@@ -647,7 +730,7 @@ const styles = StyleSheet.create({
   },
   tagReason: {
     fontSize: 12,
-    color: '#333',
+    color: '#5F6368',
     lineHeight: 18,
     marginBottom: 4,
   },
@@ -731,7 +814,7 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   timelineLabel: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#5F6368',
     marginTop: 1,
   },
@@ -762,7 +845,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   transferBadgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     color: '#F57C00',
   },
@@ -859,6 +942,29 @@ const styles = StyleSheet.create({
     color: '#1565C0',
     lineHeight: 20,
   },
+  mapLegend: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 10,
+    justifyContent: 'center',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  legendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  legendText: {
+    fontSize: 12,
+    color: '#5F6368',
+    fontWeight: '500',
+  },
   mapContainer: {
     height: 300,
     borderRadius: 12,
@@ -877,9 +983,9 @@ const styles = StyleSheet.create({
   },
   blueMarker: {
     backgroundColor: '#2196F3',
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 2,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
@@ -890,9 +996,9 @@ const styles = StyleSheet.create({
   },
   orangeMarker: {
     backgroundColor: '#FF9800',
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 2,
     borderColor: '#FFFFFF',
     shadowColor: '#000',
@@ -903,9 +1009,9 @@ const styles = StyleSheet.create({
   },
   redMarker: {
     backgroundColor: '#F44336',
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 2,
     borderColor: '#FFFFFF',
     shadowColor: '#000',

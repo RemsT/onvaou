@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import LabelSelectionField from '../components/LabelSelectionField';
 import LabelSelectionModal from '../components/LabelSelectionModal';
 import TimePickerModal from '../components/TimePickerModal';
 import BudgetPickerModal from '../components/BudgetPickerModal';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigatorSimple';
 import { LocalStationService } from '../services/localStationService';
@@ -27,6 +27,9 @@ import { DatabaseInitializationScreen } from '../components/DatabaseInitializati
 import { Station, CityLabel, CITY_LABELS } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import { recentSearchService, RecentSearch } from '../services/recentSearchService';
+import * as Haptics from 'expo-haptics';
+import SearchLoadingOverlay from '../components/SearchLoadingOverlay';
+import { useSearchContext } from '../context/SearchContext';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -54,16 +57,18 @@ export default function HomeScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const stationInputRef = useRef<any>(null);
 
-  // Recherche récente
-  const [recentSearch, setRecentSearch] = useState<RecentSearch | null>(null);
-
   // Initialisation de la base de données GTFS
   const { isInitializing, progress: initProgress, initializeDatabase, isGTFSStale } = useGTFSInitialization();
   const [isUpdating, setIsUpdating] = useState(false);
 
-  useEffect(() => {
-    recentSearchService.get().then(setRecentSearch);
-  }, []);
+  // Relance depuis l'historique
+  const { pendingRelaunch, setPendingRelaunch } = useSearchContext();
+  useFocusEffect(useCallback(() => {
+    if (pendingRelaunch) {
+      handleRelaunch(pendingRelaunch);
+      setPendingRelaunch(null);
+    }
+  }, [pendingRelaunch]));
 
   const handleStationSearch = async (text: string) => {
     setStationSearch(text);
@@ -76,7 +81,8 @@ export default function HomeScreen() {
   };
 
   const handleSelectStation = (station: Station) => {
-    Keyboard.dismiss(); // Fermer le clavier immédiatement
+    Keyboard.dismiss();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setFromStation(station);
     setStationSearch('');
     setStationSuggestions([]);
@@ -157,6 +163,7 @@ export default function HomeScreen() {
       : 'time'; // sans filtre = tout afficher
     const maxTransfers = p.directOnly ? 0 : 1;
 
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     try {
       const results = await HybridSearchService.searchDestinations(
@@ -277,6 +284,23 @@ export default function HomeScreen() {
     return <DatabaseInitializationScreen progress={initProgress} />;
   }
 
+  if (loading && fromStation) {
+    return (
+      <SearchLoadingOverlay
+        fromStation={fromStation}
+        selectedDate={selectedDate}
+        timeRangeStart={timeRangeStart}
+        timeRangeEnd={timeRangeEnd}
+        enableTimeFilter={enableTimeFilter}
+        maxTime={maxTime}
+        enableBudgetFilter={enableBudgetFilter}
+        maxBudget={maxBudget}
+        directOnly={directOnly}
+        selectedLabels={selectedLabels}
+      />
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -290,36 +314,10 @@ export default function HomeScreen() {
       >
         {/* Hero Section */}
         <View style={styles.heroSection}>
-        <Text style={styles.logo}>ONvaOU</Text>
-        <Text style={styles.heroSubtitle}>
-          Trouvez votre prochaine destination en train
-        </Text>
-      </View>
+          <Text style={styles.logo}>ONvaOU</Text>
+        </View>
 
       <View style={styles.content}>
-        {/* Bannière dernière recherche */}
-        {recentSearch && !loading && (
-          <TouchableOpacity
-            style={styles.recentSearchBanner}
-            onPress={() => handleRelaunch(recentSearch)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="time-outline" size={18} color="#4CAF50" />
-            <View style={styles.recentSearchContent}>
-              <Text style={styles.recentSearchTitle}>Dernière recherche</Text>
-              <Text style={styles.recentSearchSummary} numberOfLines={1}>
-                {recentSearch.fromStation.name}
-                {recentSearch.selectedDate ? ` · ${new Date(recentSearch.selectedDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}
-                {recentSearch.timeRangeStart && recentSearch.timeRangeEnd
-                  ? ` · ${recentSearch.timeRangeStart.replace(':', 'h')}→${recentSearch.timeRangeEnd.replace(':', 'h')}`
-                  : ''}
-                {recentSearch.enableTimeFilter ? ` · ${recentSearch.maxTime.replace(':', 'h')} max` : ''}
-                {recentSearch.enableBudgetFilter ? ` · ${recentSearch.maxBudget}€ max` : ''}
-              </Text>
-            </View>
-            <Text style={styles.recentSearchAction}>Relancer →</Text>
-          </TouchableOpacity>
-        )}
 
         {/* Station Card */}
         <View style={[styles.card, loading && styles.filterRowDisabled]}>
@@ -407,6 +405,7 @@ export default function HomeScreen() {
               style={styles.filterLeftSection}
               onPress={() => setEnableTimeFilter(!enableTimeFilter)}
               activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               disabled={loading}
             >
               <View style={[
@@ -445,6 +444,7 @@ export default function HomeScreen() {
               style={styles.filterLeftSection}
               onPress={() => setEnableBudgetFilter(!enableBudgetFilter)}
               activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               disabled={loading}
             >
               <View style={[
@@ -483,6 +483,7 @@ export default function HomeScreen() {
               style={styles.filterLeftSection}
               onPress={() => setDirectOnly(v => !v)}
               activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               disabled={loading}
             >
               <View style={[
@@ -586,18 +587,6 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Disclaimer affiché uniquement pendant la recherche */}
-        {loading && (
-          <View style={styles.searchingDisclaimer}>
-            <Text style={styles.searchingDisclaimerText}>
-              Horaires théoriques · Prix indicatifs
-            </Text>
-            <Text style={styles.searchingDisclaimerSub}>
-              Consultez SNCF Connect pour les horaires et tarifs exacts
-            </Text>
-          </View>
-        )}
-
         {/* Bannière de mise à jour des données GTFS */}
         {isGTFSStale && (
           <TouchableOpacity
@@ -661,8 +650,8 @@ const styles = StyleSheet.create({
   // Hero Section
   heroSection: {
     backgroundColor: '#FFFFFF',
-    paddingTop: 40,
-    paddingBottom: 16,
+    paddingTop: 20,
+    paddingBottom: 10,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
@@ -842,8 +831,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   customCheckbox: {
-    width: 20,
-    height: 20,
+    width: 22,
+    height: 22,
     borderRadius: 5,
     borderWidth: 2,
     borderColor: '#B0BEC5',
@@ -890,7 +879,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   labelsCardOptional: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#9E9E9E',
     fontStyle: 'italic',
   },
@@ -1046,7 +1035,7 @@ const styles = StyleSheet.create({
   },
   resetButtonText: {
     color: '#9E9E9E',
-    fontSize: 11,
+    fontSize: 12,
   },
 
   // Search hint
@@ -1066,6 +1055,16 @@ const styles = StyleSheet.create({
   },
 
   // Disclaimer affiché pendant la recherche
+  progressBarTrack: {
+    height: 3,
+    backgroundColor: '#C8E6C9',
+    width: '100%',
+  },
+  progressBarFill: {
+    height: 3,
+    backgroundColor: '#4CAF50',
+    borderRadius: 2,
+  },
   searchingDisclaimer: {
     alignItems: 'center',
     marginTop: 12,
@@ -1077,7 +1076,7 @@ const styles = StyleSheet.create({
     color: '#5F6368',
   },
   searchingDisclaimerSub: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#9E9E9E',
     marginTop: 3,
     textAlign: 'center',
@@ -1111,7 +1110,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   updateBannerText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#1565C0',
     lineHeight: 16,
   },

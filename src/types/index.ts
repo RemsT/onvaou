@@ -11,7 +11,7 @@ export type CityLabel =
   | 'kid-friendly';
 
 export const CITY_LABELS: Record<CityLabel, { name: string; icon: string; color: string }> = {
-  'plage-mer': { name: 'Plage & Mer', icon: '🏖️', color: '#56CCF2' },
+  'plage-mer': { name: 'Baignade', icon: '🏊', color: '#56CCF2' },
   'montagne': { name: 'Montagne', icon: '⛰️', color: '#8B7355' },
   'lacs-rivieres': { name: 'Lacs & Rivières', icon: '🏊', color: '#3FA7D6' },
   'sports-hiver': { name: 'Sports d\'hiver', icon: '⛷️', color: '#AED9E0' },

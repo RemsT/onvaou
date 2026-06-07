@@ -33,6 +33,8 @@ export default function MapScreen() {
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
   const [cardPosition, setCardPosition] = useState<{ x: number; y: number } | null>(null);
   const [cardHeight, setCardHeight] = useState(70);
+  const [prevSelectedId, setPrevSelectedId] = useState<string | number | null>(null);
+  const prevTrackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Android : react-native-maps n'affiche les marqueurs personnalisés que si
   // tracksViewChanges est vrai au montage (capture de la vue). On l'active
@@ -91,19 +93,29 @@ export default function MapScreen() {
     }
   }, [results, fromStation]);
 
-  // Remettre la vue par défaut quand on revient depuis l'écran détail
+  // Fermer la bulle flottante au retour depuis le détail, sans recentrer la carte
   useFocusEffect(
     useCallback(() => {
-      setSelectedResult(null);
+      setSelectedResult(prev => {
+        if (prev) {
+          setPrevSelectedId(prev.to_station.id);
+          if (prevTrackTimer.current) clearTimeout(prevTrackTimer.current);
+          prevTrackTimer.current = setTimeout(() => setPrevSelectedId(null), 600);
+        }
+        return null;
+      });
       setCardPosition(null);
-      if (results.length > 0) {
-        setTimeout(() => { fitToAllDestinations(); }, 300);
-      }
-    }, [results])
+    }, [])
   );
 
   const handleMarkerPress = async (result: SearchResult, e: any) => {
     e.stopPropagation();
+    // Mémorise l'ancien sélectionné pour forcer son re-render (reset couleur sur iOS)
+    if (selectedResult && selectedResult.to_station.id !== result.to_station.id) {
+      setPrevSelectedId(selectedResult.to_station.id);
+      if (prevTrackTimer.current) clearTimeout(prevTrackTimer.current);
+      prevTrackTimer.current = setTimeout(() => setPrevSelectedId(null), 600);
+    }
     setSelectedResult(result);
 
     // Android : ancrer l'encadré exactement sur le point tapé (nativeEvent.position,
@@ -166,7 +178,15 @@ export default function MapScreen() {
               },
             }
           : {})}
-        onPress={() => { setSelectedResult(null); setCardPosition(null); }}
+        onPress={() => {
+            if (selectedResult) {
+              setPrevSelectedId(selectedResult.to_station.id);
+              if (prevTrackTimer.current) clearTimeout(prevTrackTimer.current);
+              prevTrackTimer.current = setTimeout(() => setPrevSelectedId(null), 600);
+            }
+            setSelectedResult(null);
+            setCardPosition(null);
+          }}
       >
         {/* Point bleu pour la gare de départ */}
         <Marker
@@ -179,40 +199,48 @@ export default function MapScreen() {
           <View style={styles.blueMarker} />
         </Marker>
 
-        {/* Points rouges pour les destinations */}
+        {/* Badges durée pour les destinations */}
         {uniqueResults
           .filter(result => result.to_station.id !== fromStation.id)
-          .map((result, index) => (
-            <Marker
-              key={`marker-${result.to_station.id}-${index}`}
-              coordinate={{
-                latitude: result.to_station.lat,
-                longitude: result.to_station.lon,
-              }}
-              anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={
-                Platform.OS === 'android'
-                  ? (androidTrackMarkers || selectedResult?.to_station.id === result.to_station.id)
-                  : selectedResult?.to_station.id === result.to_station.id
-              }
-              onPress={(e) => handleMarkerPress(result, e)}
-            >
-              <View style={[
-                styles.redMarker,
-                selectedResult?.to_station.id === result.to_station.id && styles.redMarkerSelected,
-              ]} />
-            </Marker>
-          ))}
+          .map((result, index) => {
+            const isSelected = selectedResult?.to_station.id === result.to_station.id;
+            const dur = result.duration >= 60
+              ? `${Math.floor(result.duration / 60)}h${result.duration % 60 > 0 ? (result.duration % 60).toString().padStart(2, '0') : ''}`
+              : `${result.duration}min`;
+            return (
+              <Marker
+                key={`marker-${result.to_station.id}-${index}`}
+                coordinate={{
+                  latitude: result.to_station.lat,
+                  longitude: result.to_station.lon,
+                }}
+                anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges={
+                  Platform.OS === 'android'
+                    ? (androidTrackMarkers || isSelected || prevSelectedId === result.to_station.id)
+                    : (isSelected || prevSelectedId === result.to_station.id)
+                }
+                onPress={(e) => handleMarkerPress(result, e)}
+              >
+                <View style={styles.markerContainer}>
+                  <View style={[styles.dotMarker, isSelected && styles.dotMarkerSelected]} />
+                </View>
+              </Marker>
+            );
+          })}
       </MapView>
 
-      {/* Message si aucune destination trouvée (au lieu d'une carte vide) */}
+      {/* Message si aucune destination trouvée */}
       {results.length === 0 && (
         <View style={[styles.emptyOverlay, { pointerEvents: 'box-none' }]}>
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>Aucune destination trouvée</Text>
             <Text style={styles.emptyText}>
-              Aucun trajet depuis {fromStation.name} ne correspond à vos critères.
-              Essayez d'augmenter le temps ou le budget, ou d'élargir vos centres d'intérêt.
+              {mode === 'time' && maxValue && maxValue < 120
+                ? `La durée max de ${Math.floor(maxValue / 60)}h est très courte. Essayez 3h ou plus.`
+                : mode === 'budget' && maxValue && maxValue < 25
+                ? `Le budget de ${maxValue}€ est très bas. Essayez 30€ ou plus.`
+                : `Aucun trajet depuis ${fromStation.name} ne correspond à vos critères. Essayez d'élargir la plage horaire ou les filtres.`}
             </Text>
             <TouchableOpacity style={styles.emptyButton} onPress={() => navigation.goBack()}>
               <Text style={styles.emptyButtonText}>Modifier la recherche</Text>
@@ -290,6 +318,16 @@ export default function MapScreen() {
                 ? ` · ${maxValue}€ max`
                 : ''}
             </Text>
+            <View style={styles.mapLegend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#2196F3' }]} />
+                <Text style={styles.legendText}>Départ</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#F44336' }]} />
+                <Text style={styles.legendText}>Destinations</Text>
+              </View>
+            </View>
           </View>
           <Text style={styles.infoCardArrow}>›</Text>
         </View>
@@ -319,7 +357,12 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
   },
-  redMarker: {
+  markerContainer: {
+    padding: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: 'transparent',
+  },
+  dotMarker: {
     backgroundColor: '#F44336',
     width: 12,
     height: 12,
@@ -332,11 +375,11 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 3,
   },
-  redMarkerSelected: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 3,
+  dotMarkerSelected: {
+    backgroundColor: '#4CAF50',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   selectedCard: {
     position: 'absolute',
@@ -430,6 +473,26 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontWeight: 'bold',
   },
+  mapLegend: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 6,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    fontSize: 11,
+    color: '#5F6368',
+    opacity: 0.8,
+  },
   infoCardTitle: {
     fontSize: 15,
     fontWeight: '700',
@@ -485,8 +548,8 @@ const styles = StyleSheet.create({
   },
   recenterButton: {
     position: 'absolute',
-    top: 20,
-    left: 20,
+    top: Platform.OS === 'ios' ? 56 : 24,
+    left: 16,
     backgroundColor: '#FFFFFF',
     width: 48,
     height: 48,

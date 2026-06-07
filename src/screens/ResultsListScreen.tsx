@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  RefreshControl,
+  Share,
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
@@ -27,17 +29,16 @@ export default function ResultsListScreen() {
   const { fromStation, results, mode, maxValue, searchDate, maxTransfers } = route.params;
   const [sortType, setSortType] = useState<SortType>('duration');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const listRef = useRef<FlatList>(null);
 
-  // Fonction pour gérer le changement de tri
   const handleSortChange = (newSortType: SortType) => {
     if (newSortType === sortType) {
-      // Si on clique sur le même bouton, inverser l'ordre
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
-      // Si on change de type de tri, réinitialiser en croissant
       setSortType(newSortType);
       setSortOrder('asc');
     }
+    setTimeout(() => listRef.current?.scrollToOffset({ offset: 0, animated: true }), 50);
   };
 
   // Trier les résultats selon le type de tri sélectionné
@@ -68,8 +69,7 @@ export default function ResultsListScreen() {
 
   const renderDestinationItem = ({ item }: { item: SearchResult }) => {
     const numId = typeof item.to_station_id === 'number' ? item.to_station_id : parseInt(String(item.to_station_id));
-    const topTag = getStationTags(numId)[0];
-    const topTagInfo = topTag ? CITY_LABELS[topTag.label] : null;
+    const tags = getStationTags(numId);
 
     return (
       <TouchableOpacity
@@ -95,8 +95,8 @@ export default function ResultsListScreen() {
                 hour: '2-digit',
                 minute: '2-digit',
               })}
-              {item.tripCount != null && item.tripCount > 0
-                ? ` · ${item.tripCount} train${item.tripCount > 1 ? 's' : ''}`
+              {item.tripCount != null && item.tripCount >= 2
+                ? ` · ${item.tripCount} trains`
                 : ''}
             </Text>
           </View>
@@ -116,11 +116,17 @@ export default function ResultsListScreen() {
             </View>
           )}
         </View>
-        {topTag && topTagInfo ? (
-          <Text style={[styles.topTagText, { color: topTagInfo.color }]}>
-            {topTag.reason}
-          </Text>
-        ) : null}
+        {tags.length > 0 && (
+          <View style={styles.tagRow}>
+            {tags.map(t => (
+              <View key={t.label} style={[styles.tagChip, { borderColor: CITY_LABELS[t.label].color }]}>
+                <Text style={[styles.tagChipText, { color: CITY_LABELS[t.label].color }]}>
+                  {CITY_LABELS[t.label].name}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
@@ -146,13 +152,17 @@ export default function ResultsListScreen() {
             {mode === 'both' && (
               <Text style={styles.headerCriteria}>· temps & budget</Text>
             )}
+            {maxTransfers === 0 && (
+              <View style={styles.directBadge}>
+                <Text style={styles.directBadgeText}>Direct</Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
 
       {/* Sort Options */}
       <View style={styles.sortContainer}>
-        <Text style={styles.sortLabel}>Trier par:</Text>
         <View style={styles.sortButtons}>
           <TouchableOpacity
             style={[
@@ -251,10 +261,19 @@ export default function ResultsListScreen() {
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           data={sortedResults}
           renderItem={renderDestinationItem}
           keyExtractor={(item, index) => `result-${item.to_station_id}-${item.duration}-${index}`}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={false}
+              onRefresh={() => navigation.goBack()}
+              tintColor="#4CAF50"
+              colors={['#4CAF50']}
+            />
+          }
         />
       )}
     </View>
@@ -295,6 +314,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#ffffff',
     opacity: 0.85,
+  },
+  directBadge: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 4,
+  },
+  directBadgeText: {
+    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: '700',
   },
   listContent: {
     padding: 16,
@@ -349,12 +380,13 @@ const styles = StyleSheet.create({
     color: '#0C3823',
   },
   detailLabelSmall: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     color: '#5F6368',
   },
   detailTextSmall: {
-    fontSize: 11,
+    fontSize: 13,
+    fontWeight: '600',
     color: '#0C3823',
   },
   emptyState: {
@@ -442,10 +474,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#F57C00',
   },
-  topTagText: {
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 10,
+  },
+  tagChip: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    backgroundColor: 'transparent',
+  },
+  tagChipText: {
     fontSize: 11,
-    fontWeight: '500',
-    marginTop: 6,
-    opacity: 0.85,
+    fontWeight: '600',
   },
 });
