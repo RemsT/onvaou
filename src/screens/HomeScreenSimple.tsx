@@ -15,6 +15,7 @@ import {
 import CustomDateTimePicker from '../components/DateTimePicker';
 import LabelSelectionField from '../components/LabelSelectionField';
 import LabelSelectionModal from '../components/LabelSelectionModal';
+import { setTravelMode } from '../data/stationLabels';
 import TimePickerModal from '../components/TimePickerModal';
 import BudgetPickerModal from '../components/BudgetPickerModal';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -29,6 +30,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { recentSearchService, RecentSearch } from '../services/recentSearchService';
 import * as Haptics from 'expo-haptics';
 import SearchLoadingOverlay from '../components/SearchLoadingOverlay';
+import SafeTopBand from '../components/SafeTopBand';
 import { useSearchContext } from '../context/SearchContext';
 
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
@@ -47,6 +49,14 @@ export default function HomeScreen() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedLabels, setSelectedLabels] = useState<CityLabel[]>([]);
   const [labelFilterMode, setLabelFilterMode] = useState<'OR' | 'AND'>('OR');
+  // Mode de déplacement : « à pied » masque le tag Vélo et borne les sites au temps de marche (profil).
+  const [travelMode, setTravelModeState] = useState<'walk' | 'bike'>('bike');
+  const applyTravelMode = (m: 'walk' | 'bike') => {
+    setTravelModeState(m);
+    setTravelMode(m);
+    if (m === 'walk') setSelectedLabels(prev => prev.filter(l => l !== 'velo'));
+  };
+  useEffect(() => { setTravelMode(travelMode); }, []);
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [showTimePickerModal, setShowTimePickerModal] = useState(false);
   const [showBudgetPickerModal, setShowBudgetPickerModal] = useState(false);
@@ -307,6 +317,7 @@ export default function HomeScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
+      <SafeTopBand />
       <ScrollView
         style={styles.container}
         showsVerticalScrollIndicator={false}
@@ -500,6 +511,29 @@ export default function HomeScreen() {
 
         </View>
 
+        {/* Mode de déplacement sur place (à pied / à vélo) */}
+        <View style={[styles.card, loading && styles.filterRowDisabled]}>
+          <Text style={[styles.cardTitle, { marginBottom: 8 }]}>Sur place, je me déplace</Text>
+          <View style={styles.travelRow}>
+            {(['walk', 'bike'] as const).map(m => {
+              const active = travelMode === m;
+              return (
+                <TouchableOpacity
+                  key={m}
+                  style={[styles.travelBtn, active && styles.travelBtnActive]}
+                  onPress={() => applyTravelMode(m)}
+                  disabled={loading}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.travelBtnText, active && styles.travelBtnTextActive]}>
+                    {m === 'walk' ? '🚶 À pied' : '🚲 À vélo'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         {/* Centres d'intérêt Card */}
         <TouchableOpacity
           style={[
@@ -620,6 +654,7 @@ export default function HomeScreen() {
         visible={showLabelModal}
         selectedLabels={selectedLabels}
         labelFilterMode={labelFilterMode}
+        hiddenLabels={travelMode === 'walk' ? ['velo'] : []}
         onClose={handleLabelModalClose}
       />
 
@@ -650,8 +685,8 @@ const styles = StyleSheet.create({
   // Hero Section
   heroSection: {
     backgroundColor: '#FFFFFF',
-    paddingTop: 20,
-    paddingBottom: 10,
+    paddingTop: 8,
+    paddingBottom: 6,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
@@ -663,10 +698,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logo: {
-    fontSize: 36,
+    fontSize: 24,
     fontWeight: '800',
     color: '#4CAF50',
-    marginBottom: 4,
+    marginBottom: 0,
     letterSpacing: -1,
     textAlign: 'center',
   },
@@ -865,6 +900,15 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 6,
   },
+  travelRow: { flexDirection: 'row', gap: 8 },
+  travelBtn: {
+    flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 10,
+    backgroundColor: '#EEF1F4', borderWidth: 1, borderColor: 'transparent',
+  },
+  travelBtnActive: { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' },
+  travelBtnText: { fontSize: 15, fontWeight: '600', color: '#5F6368' },
+  travelBtnTextActive: { color: '#0C3823', fontWeight: '700' },
+  travelHint: { fontSize: 12, color: '#5F6368', marginTop: 8, lineHeight: 17 },
   labelsCard: {
     gap: 8,
   },

@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { recentSearchService, RecentSearch } from '../services/recentSearchService';
 import { useSearchContext } from '../context/SearchContext';
 import { CITY_LABELS } from '../types';
+import SafeTopBand from '../components/SafeTopBand';
 
 function formatRelativeTime(timestamp: number): string {
   const diff = Date.now() - timestamp;
@@ -52,7 +53,9 @@ export default function HistoriqueScreen() {
   const handleRelaunch = (search: RecentSearch) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setPendingRelaunch(search);
-    navigation.navigate('Rechercher');
+    // Cibler explicitement l'écran Home de la pile (sinon on retombe sur l'écran courant
+    // de l'onglet Rechercher : MapView/Détail/Itinéraire).
+    navigation.navigate('Rechercher', { screen: 'Home' });
   };
 
   const renderItem = ({ item }: { item: RecentSearch }) => {
@@ -90,8 +93,8 @@ export default function HistoriqueScreen() {
         {item.selectedLabels.length > 0 && (
           <View style={styles.tagRow}>
             {item.selectedLabels.map(l => (
-              <View key={l} style={[styles.tagChip, { borderColor: CITY_LABELS[l].color }]}>
-                <Text style={[styles.tagChipText, { color: CITY_LABELS[l].color }]}>
+              <View key={l} style={[styles.tagChip, { backgroundColor: CITY_LABELS[l].color + '22' }]}>
+                <Text style={styles.tagChipText}>
                   {CITY_LABELS[l].name}
                 </Text>
               </View>
@@ -116,6 +119,7 @@ export default function HistoriqueScreen() {
 
   return (
     <View style={styles.container}>
+      <SafeTopBand />
       <FlatList
         data={searches}
         renderItem={renderItem}
@@ -167,8 +171,8 @@ const styles = StyleSheet.create({
     color: '#5F6368',
   },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  tagChip: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 2 },
-  tagChipText: { fontSize: 11, fontWeight: '600' },
+  tagChip: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  tagChipText: { fontSize: 12, fontWeight: '600', color: '#0C3823' },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -8,6 +8,7 @@ interface LabelSelectionModalProps {
   visible: boolean;
   selectedLabels: CityLabel[];
   labelFilterMode: 'OR' | 'AND';
+  hiddenLabels?: CityLabel[]; // labels non proposés (ex. 'velo' en mode à pied)
   onClose: (selectedLabels: CityLabel[], mode: 'OR' | 'AND') => void;
 }
 
@@ -15,10 +16,12 @@ export default function LabelSelectionModal({
   visible,
   selectedLabels,
   labelFilterMode,
+  hiddenLabels = [],
   onClose,
 }: LabelSelectionModalProps) {
   const [tempSelected, setTempSelected] = useState<CityLabel[]>(selectedLabels);
   const [tempMode, setTempMode] = useState<'OR' | 'AND'>(labelFilterMode);
+  const visibleLabels = UI_LABELS.filter(l => !hiddenLabels.includes(l));
 
   // Re-synchroniser avec les centres déjà sélectionnés à chaque ouverture
   useEffect(() => {
@@ -50,10 +53,10 @@ export default function LabelSelectionModal({
           {/* Clear */}
           <View style={styles.actionsBar}>
             <Text style={styles.countText}>
-              {tempSelected.length} / {UI_LABELS.length} sélectionné{tempSelected.length > 1 ? 's' : ''}
+              {tempSelected.length} / {visibleLabels.length} sélectionné{tempSelected.length > 1 ? 's' : ''}
             </Text>
             <View style={styles.actionsButtons}>
-              <TouchableOpacity onPress={() => setTempSelected([...UI_LABELS])}>
+              <TouchableOpacity onPress={() => setTempSelected([...visibleLabels])}>
                 <Text style={styles.selectAllBtn}>Tout sélectionner</Text>
               </TouchableOpacity>
               {tempSelected.length > 0 && (
@@ -66,7 +69,7 @@ export default function LabelSelectionModal({
 
           {/* Labels */}
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            {UI_LABELS.map(label => {
+            {visibleLabels.map(label => {
               const info = CITY_LABELS[label];
               const selected = tempSelected.includes(label);
               return (
