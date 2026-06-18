@@ -113,6 +113,17 @@ Règles vérifiées à la dure (ne PAS refaire ces erreurs) :
   mal en hue → pin invisible/incorrect.
 - Vaut aussi pour les cartes dans un **ScrollView** (cas de la fiche détail).
 
+## Tags d'activité (v2) — registre + plausibilité pied/vélo (sans routing)
+
+- **Registre unique** : `src/config/tags.json` (clé, nom, icône, couleur, classes DATAtourisme, `radiusKm`, `noun`). Consommé par l'app (`CITY_LABELS`/`CityLabel`/`UI_LABELS` dans `types/index.ts` en sont **dérivés**) ET par le générateur. **Ajouter un tag = une entrée JSON**, aucun code à toucher.
+- **Génération** : `scripts/generate-tags.js` (voir `scripts/README.md`). Hors-ligne, **aucune API/clé**. Cap « ≤ 20 min de vélo » : `KEEP_MAX_KM` n'est plus fixe mais **dérivé** de `BIKE_MAX_MIN=20` (≈ 3,1 km à vol d'oiseau). Les POI au-delà (et les tags vides) sont **élagués**.
+- **Données par POI** (`TaggedPoi`) : `name`, `url`, `lat`, `lon`, `km` (distance **à vol d'oiseau**). Les champs `mode/minutes/ascent/route` existent (optionnels) mais **ne sont pas remplis** ici.
+- **Routing au runtime (Valhalla)** : `src/services/routingService.ts` `fetchRoute` appelle l'instance publique Valhalla (gratuite, sans clé) pour dessiner le **vrai tracé** pied/vélo dans `RouteMapScreen` (repli ligne droite si hors-ligne/échec). Le **mode suggéré** (🚶 ≤ 2 km, sinon 🚲) reste dérivé de `km` (`directions.ts` `modeForDistanceKm`, `WALK_SUGGEST_KM`). Filtre fin « > 20 min vélo » : `MAX_BIKE_MIN`/`isBeyondBikeCap` (minutes réelles Valhalla).
+- **Affichage** : fiche destination = « 🚶/🚲 à ~X km » + bouton « Voir le trajet » → `RouteMapScreen` (vrai tracé, temps, 2 points, sélecteur pied/vélo) → `openDirections`. Liste résultats = mini-liste d'envies + tri « Proximité » + filtre « avec activités ».
+- **Itinéraire / navigation** : `src/utils/directions.ts` → `openDirections` **plateforme-aware** : iOS marche → Apple Plans (`maps.apple.com`, `dirflg=w`), iOS vélo + Android → Google Maps (`dir_action=navigate`).
+- **Sorties à la journée (rando/vélo)** : `scripts/generate-trails.js` génère `src/data/trailsGenerated.ts` (`Trail[]` par gare) depuis OSM/ON3V (ODbL, **attribution OSM obligatoire**), 100 % embarqué, **zéro API runtime**. Tags `randonnee` (à enrichir) / `velo` (à ajouter) **après** la 1re génération de données. Voir `scripts/README.md`.
+- **Réactualisation** : re-télécharger le CSV DATAtourisme (`/tmp/dt_place.csv`) + `node scripts/generate-tags.js`.
+
 ## Patterns à respecter
 
 - Les nouvelles dépendances qui nécessitent un **module natif** (LinearGradient, Camera, etc.) ne fonctionnent **pas dans Expo Go** — utiliser uniquement des APIs Expo compatibles Expo Go, ou documenter qu'un dev build est requis.

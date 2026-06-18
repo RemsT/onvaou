@@ -18,6 +18,8 @@ jest.mock('../src/services/tariffService', () => ({
 jest.mock('../src/data/stationLabels', () => ({
   filterStationsByLabels: jest.fn((ids: string[]) => ids),
   countLabelMatches: jest.fn().mockReturnValue(0),
+  getStationLabels: jest.fn().mockReturnValue([]),
+  getTrailPrefsVersion: jest.fn().mockReturnValue(0),
 }));
 
 // ─── Stations réelles SNCF ────────────────────────────────────────────────────

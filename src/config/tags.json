@@ -1,0 +1,72 @@
+[
+  {
+    "key": "plage-mer",
+    "name": "Baignade",
+    "icon": "🏊",
+    "color": "#2196F3",
+    "datatourismeClasses": ["Beach", "BeachClub", "Lake", "Waterfall"],
+    "radiusKm": 10,
+    "minReachable": 1,
+    "noun": "plages, lacs et rivières"
+  },
+  {
+    "key": "sports-hiver",
+    "name": "Sports d'hiver",
+    "icon": "⛷️",
+    "color": "#5C6BC0",
+    "datatourismeClasses": ["CrossCountrySkiResort", "DownhillSkiResort", "DownhillSkiRun", "CrossCountrySkiTrail"],
+    "radiusKm": 12,
+    "minReachable": 1,
+    "noun": "domaines de ski"
+  },
+  {
+    "key": "randonnee",
+    "name": "Randonnée",
+    "icon": "🥾",
+    "color": "#43A047",
+    "datatourismeClasses": ["EducationalTrail", "NaturalPark"],
+    "radiusKm": 8,
+    "minReachable": 1,
+    "noun": "sentiers/parcs naturels"
+  },
+  {
+    "key": "velo",
+    "name": "Vélo",
+    "icon": "🚴",
+    "color": "#00838F",
+    "datatourismeClasses": [],
+    "radiusKm": 4,
+    "minReachable": 1,
+    "noun": "sorties vélo"
+  },
+  {
+    "key": "culture-histoire",
+    "name": "Culture & Histoire",
+    "icon": "🏛️",
+    "color": "#8E44AD",
+    "datatourismeClasses": ["Castle", "FortifiedCastle", "CastleAndPrestigeMansion", "Museum", "CulturalSite", "RemarkableBuilding", "TechnicalHeritage"],
+    "radiusKm": 4,
+    "minReachable": 1,
+    "noun": "sites culturels"
+  },
+  {
+    "key": "gastronomie",
+    "name": "Gastronomie",
+    "icon": "🍽️",
+    "color": "#FB8C00",
+    "datatourismeClasses": ["Cellar", "GourmetRestaurant", "TastingProvider"],
+    "radiusKm": 5,
+    "minReachable": 1,
+    "noun": "caves/tables gastronomiques"
+  },
+  {
+    "key": "kid-friendly",
+    "name": "Famille",
+    "icon": "👨‍👩‍👧‍👦",
+    "color": "#EC407A",
+    "datatourismeClasses": ["ThemePark", "ZooAnimalPark", "VivariumAquarium"],
+    "radiusKm": 10,
+    "minReachable": 1,
+    "noun": "parcs de loisirs/zoos"
+  }
+]

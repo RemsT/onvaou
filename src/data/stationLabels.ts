@@ -1,6 +1,13 @@
-import { CityLabel, StationData, TagEvidence, UI_LABELS } from '../types';
+import { CityLabel, StationData, TagEvidence, Trail, UI_LABELS } from '../types';
 import { allStations } from './allStations';
 import { generatedLabels } from './stationLabelsGenerated';
+import { generatedTrails } from './trailsGenerated';
+import {
+  TrailPreferences,
+  DEFAULT_PREFERENCES,
+  trailMatchesPreferences,
+  walkMinutesToKm,
+} from '../services/profilePreferencesService';
 
 const UI_LABELS_SET = new Set<CityLabel>(UI_LABELS);
 
@@ -120,7 +127,7 @@ const manualLabels: Record<string, StationData> = {
     wikipediaUrl: W + 'Chambéry',
     tags: [
       tag('montagne', 'Préfecture de Savoie, massif des Bauges à 15km', W + 'Chambéry', 'Voir Chambéry', 95),
-      tag('lacs-rivieres', 'Lac du Bourget (4 450 ha), plus grand lac naturel de France, à 8km', SANDRE + 'FRF44', 'Voir le Lac du Bourget sur SANDRE', 100),
+      tag('plage-mer', 'Lac du Bourget (4 450 ha), plus grand lac naturel de France, à 8km', SANDRE + 'FRF44', 'Voir le Lac du Bourget sur SANDRE', 100),
       tag('sports-hiver', 'Accès aux Saisies, Porte des Alpes, Belledonne', W + 'Savoie', 'Voir les stations', 90),
       tag('randonnee', 'Parc Naturel Régional du Massif des Bauges à 15km', 'https://www.parcdesbauges.com/', 'Voir le Parc des Bauges', 90),
     ],
@@ -129,7 +136,7 @@ const manualLabels: Record<string, StationData> = {
     description: 'Aix-les-Bains est une ville thermale en bord du Lac du Bourget, plus grand lac naturel de France.',
     wikipediaUrl: W + 'Aix-les-Bains',
     tags: [
-      tag('lacs-rivieres', 'Lac du Bourget (4 450 ha), plus grand lac naturel de France, riverain direct', SANDRE + 'FRF44', 'Voir le Lac du Bourget sur SANDRE', 100),
+      tag('plage-mer', 'Lac du Bourget (4 450 ha), plus grand lac naturel de France, riverain direct', SANDRE + 'FRF44', 'Voir le Lac du Bourget sur SANDRE', 100),
       tag('montagne', 'Préalpes de Savoie, Dent du Chat dominant le lac', W + 'Aix-les-Bains', 'Voir Aix-les-Bains', 85),
     ],
   },
@@ -137,7 +144,7 @@ const manualLabels: Record<string, StationData> = {
     description: 'Annecy, surnommée la "Venise des Alpes", est une ville de Haute-Savoie bordée d\'un lac aux eaux cristallines.',
     wikipediaUrl: W + 'Annecy',
     tags: [
-      tag('lacs-rivieres', 'Lac d\'Annecy (2 727 ha), l\'un des lacs les plus purs d\'Europe', SANDRE + 'FRF10', 'Voir le Lac d\'Annecy sur SANDRE', 100),
+      tag('plage-mer', 'Lac d\'Annecy (2 727 ha), l\'un des lacs les plus purs d\'Europe', SANDRE + 'FRF10', 'Voir le Lac d\'Annecy sur SANDRE', 100),
       tag('montagne', 'Haute-Savoie, massif des Aravis, vue sur les Alpes', W + 'Annecy', 'Voir Annecy', 95),
       tag('randonnee', 'Tour du Lac d\'Annecy, Parc des Bauges à 20km', 'https://www.cirkwi.com/fr/circuit/21009-tour-du-lac-d-annecy', 'Voir le tour du lac', 95),
       tag('sports-hiver', 'La Clusaz, Le Grand-Bornand à 30km', W + 'La_Clusaz', 'Voir La Clusaz', 85),
@@ -663,7 +670,7 @@ const manualLabels: Record<string, StationData> = {
     wikipediaUrl: W + 'Besançon',
     tags: [
       tag('culture-histoire', 'Citadelle de Vauban classée UNESCO, horloge astronomique', W + 'Citadelle_de_Besançon', 'Voir la Citadelle', 95),
-      tag('lacs-rivieres', 'Boucles du Doubs, gorges du Doubs à 30km', W + 'Doubs_(rivière)', 'Voir les gorges du Doubs', 85),
+      tag('plage-mer', 'Boucles du Doubs, gorges du Doubs à 30km', W + 'Doubs_(rivière)', 'Voir les gorges du Doubs', 85),
     ],
   },
   "87683573": { // Auxerre Saint-Gervais
@@ -691,14 +698,34 @@ const manualLabels: Record<string, StationData> = {
 
 /**
  * Tags de toutes les gares.
- * Fusion : données générées depuis DATAtourisme (base nationale officielle,
- * data.gouv.fr) + curation manuelle prioritaire (descriptions + sources vérifiées).
- * Pour une gare présente dans les deux, la curation manuelle l'emporte.
+ * Fusion : données générées DATAtourisme (POIs avec coordonnées → « Voir le trajet ») +
+ * curation manuelle (descriptions + sources vérifiées). Pour une gare présente dans les deux,
+ * on garde la description/source curée ET on AJOUTE les tags générés : la fusion par label de
+ * getStationData combine alors « reason » curé + POIs générés (donc « Voir le trajet » partout).
  */
-export const stationLabels: Record<string, StationData> = {
-  ...generatedLabels,
-  ...manualLabels,
-};
+function mergeStationData(
+  gen: Record<string, StationData>,
+  man: Record<string, StationData>,
+): Record<string, StationData> {
+  const out: Record<string, StationData> = { ...gen };
+  for (const [uic, m] of Object.entries(man)) {
+    const g = gen[uic];
+    if (!g) { out[uic] = m; continue; }
+    // On garde le SET de tags curé, mais on attache les POIs générés (avec coordonnées →
+    // « Voir le trajet ») au tag manuel de même label quand il n'en a pas. Pas de tag ajouté.
+    const tags = m.tags.map((mt) => {
+      // Rando/vélo : pas de POIs DATAtourisme (points sans longueur) ; restent descriptifs.
+      if (mt.label === 'randonnee' || mt.label === 'velo') return mt;
+      if (mt.pois && mt.pois.length) return mt;
+      const gt = g.tags.find((t) => t.label === mt.label && t.pois && t.pois.length);
+      return gt ? { ...mt, pois: gt.pois } : mt;
+    });
+    out[uic] = { ...g, ...m, tags };
+  }
+  return out;
+}
+
+export const stationLabels: Record<string, StationData> = mergeStationData(generatedLabels, manualLabels);
 
 // ─── Résolution d'identifiant (robuste aux évolutions de la base) ───────────
 //
@@ -735,17 +762,133 @@ function resolveUic(idOrSncf: number | string): string | null {
 
 // ─── Fonctions d'accès ────────────────────────────────────────────────────
 
+// TagEvidence synthétique pour une sortie à la journée (rando/vélo) — alimenté par les tracés
+// embarqués (pas DATAtourisme). Les tracés eux-mêmes sont rendus via getStationTrails().
+function trailTag(label: CityLabel, noun: string): TagEvidence {
+  return {
+    label,
+    reason: `Sorties ${noun} au départ de la gare`,
+    source: 'https://www.openstreetmap.org/copyright',
+    linkLabel: '© contributeurs OpenStreetMap',
+    confidence: 85,
+  };
+}
+
+// Préférences de profil actives (plages km, type, durée) — poussées par l'app via setTrailPrefs.
+// Le tag rando/vélo d'une gare n'est injecté que si elle a un tour CONFORME à ces critères :
+// cohérent partout (filtre de recherche + affichage). Changer les prefs vide le cache.
+let currentPrefs: TrailPreferences = DEFAULT_PREFERENCES;
+// Mode de déplacement de la recherche : en « à pied », on masque le tag Vélo et on borne les sites
+// au temps de marche max du profil ; en « à vélo », pas de restriction de marche.
+let currentTravelMode: 'walk' | 'bike' = 'bike';
+// Version incrémentée à chaque changement de prefs/mode : invalide le cache de recherche
+// (LocalSearchService) qui dépend indirectement de ces réglages via les tags.
+let trailPrefsVersion = 0;
+export function getTrailPrefsVersion(): number {
+  return trailPrefsVersion;
+}
+export function setTrailPrefs(prefs: TrailPreferences): void {
+  currentPrefs = prefs;
+  trailPrefsVersion++;
+  stationDataCache.clear();
+}
+export function setTravelMode(mode: 'walk' | 'bike'): void {
+  currentTravelMode = mode;
+  trailPrefsVersion++;
+  stationDataCache.clear();
+}
+export function getTravelMode(): 'walk' | 'bike' {
+  return currentTravelMode;
+}
+
+// Un tour est-il VISIBLE selon TOUS les filtres actifs : plages km, type, durée max (profil) ET le
+// mode de déplacement (en « à pied » : pas de vélo, et accès ≤ temps de marche max du profil).
+function trailVisible(t: Trail): boolean {
+  if (!trailMatchesPreferences(t, currentPrefs)) return false;
+  if (currentTravelMode === 'walk') {
+    if (t.mode !== 'walk') return false;
+    if (t.accessKm > walkMinutesToKm(currentPrefs.maxWalkMinutes)) return false;
+  }
+  return true;
+}
+
+// Cache mémoïsé : les données d'une gare sont statiques (DATAtourisme + tracés embarqués).
+// getStationData est appelé en boucle dans le tri/filtre de recherche (countLabelMatches × O(n log n)) :
+// sans cache, chaque appel ré-alloue des tableaux → recherche lente. Clé = code UIC.
+const stationDataCache = new Map<string, StationData | null>();
+
 export function getStationData(idOrSncf: number | string): StationData | null {
   const uic = resolveUic(idOrSncf);
   if (!uic) return null;
+  const cached = stationDataCache.get(uic);
+  if (cached !== undefined) return cached;
+
   const data = stationLabels[uic];
-  if (!data) return null;
-  // Ne conserver que les tags de la liste exposée dans l'UI
-  return { ...data, tags: data.tags.filter(t => UI_LABELS_SET.has(t.label)) };
+  // Ne conserver que les tags de la liste exposée dans l'UI.
+  // Sous 'randonnee'/'velo', on retire les POIs DATAtourisme (des POINTS sans longueur — leur « km »
+  // est la distance, pas la longueur de la sortie ; ex. visites audioguidées) qui ne respectent pas
+  // la plage du Profil. On GARDE en revanche les tags curés SANS pois (descriptions GR/parcs) et les
+  // vrais tracés (injectés ci-dessous, longueur connue, filtrés par le Profil).
+  const isTrailTag = (t: TagEvidence) => t.label === 'randonnee' || t.label === 'velo';
+  let tags: TagEvidence[] = data
+    ? data.tags.filter(t => UI_LABELS_SET.has(t.label) && !(isTrailTag(t) && t.pois && t.pois.length))
+    : [];
+
+  // Injecter les tags rando/vélo si la gare a ≥ 1 tour VISIBLE (critères profil + mode de déplacement).
+  const trails = generatedTrails[uic] || [];
+  const hasWalk = trails.some(t => t.mode === 'walk' && trailVisible(t));
+  const hasBike = trails.some(t => t.mode === 'bike' && trailVisible(t));
+  if (hasWalk && !tags.some(t => t.label === 'randonnee') && UI_LABELS_SET.has('randonnee')) {
+    tags = [...tags, trailTag('randonnee', 'à pied')];
+  }
+  // Le tag Vélo n'est PAS proposé en mode « à pied ».
+  if (hasBike && currentTravelMode !== 'walk' && !tags.some(t => t.label === 'velo') && UI_LABELS_SET.has('velo')) {
+    tags = [...tags, trailTag('velo', 'à vélo')];
+  }
+
+  // Fusion des tags de même label (ex. après fusion Baignade + Lacs/Rivières une gare peut avoir
+  // 2 tags 'plage-mer') : on garde un seul tag par label et on combine ses POIs (dédup par nom).
+  const merged = new Map<CityLabel, TagEvidence>();
+  for (const t of tags) {
+    const ex = merged.get(t.label);
+    if (!ex) {
+      merged.set(t.label, { ...t, pois: t.pois ? [...t.pois] : t.pois });
+    } else if (t.pois && t.pois.length) {
+      const names = new Set((ex.pois ?? []).map(p => p.name));
+      ex.pois = [...(ex.pois ?? []), ...t.pois.filter(p => !names.has(p.name))];
+    }
+  }
+  tags = [...merged.values()];
+
+  // Mode « à pied » : masquer Vélo et ne garder que les sites accessibles ≤ temps de marche max
+  // du profil (les tags descriptifs sans POIs restent ; ceux dont tous les POIs sont hors rayon
+  // sont retirés). Sans effet en mode « à vélo ».
+  if (currentTravelMode === 'walk') {
+    const capKm = walkMinutesToKm(currentPrefs.maxWalkMinutes);
+    tags = tags
+      .filter(t => t.label !== 'velo')
+      .map(t => (t.pois && t.pois.length ? { ...t, pois: t.pois.filter(p => p.km == null || p.km <= capKm) } : t))
+      .filter(t => !(t.pois && t.pois.length === 0));
+  }
+
+  const result: StationData | null = (!data && tags.length === 0) ? null : { ...(data ?? { tags: [] }), tags };
+  stationDataCache.set(uic, result);
+  return result;
 }
 
 export function getStationLabels(idOrSncf: number | string): CityLabel[] {
   return getStationData(idOrSncf)?.tags.map(t => t.label) || [];
+}
+
+/** Sorties à la journée rattachées à une gare. Vide tant que les données ne sont pas générées. */
+export function getStationTrails(idOrSncf: number | string): Trail[] {
+  const uic = resolveUic(idOrSncf);
+  return (uic && generatedTrails[uic]) || [];
+}
+
+/** Sorties rattachées à une gare VISIBLES (critères profil + mode de déplacement). */
+export function getStationTrailsMatching(idOrSncf: number | string): Trail[] {
+  return getStationTrails(idOrSncf).filter(trailVisible);
 }
 
 export function getStationTags(idOrSncf: number | string): TagEvidence[] {

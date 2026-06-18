@@ -54,17 +54,41 @@ async function migrate(): Promise<void> {
 
 const sortDesc = (list: RecentSearch[]) => [...list].sort((a, b) => b.timestamp - a.timestamp);
 
+// Signature d'une recherche pour dé-dupliquer l'historique : gare + filtres uniquement.
+// La DATE est volontairement EXCLUE (même gare + mêmes filtres à des dates différentes = une
+// seule entrée, remontée en tête à chaque relance).
+function signatureOf(s: Omit<RecentSearch, 'id' | 'timestamp' | 'isFavorite'>): string {
+  const station = (s.fromStation as any)?.uic ?? (s.fromStation as any)?.id ?? s.fromStation?.name ?? '';
+  const labels = [...(s.selectedLabels ?? [])].sort().join(',');
+  return [
+    station,
+    s.enableTimeFilter,
+    s.enableBudgetFilter,
+    s.maxTime,
+    s.maxBudget,
+    labels,
+    s.labelFilterMode,
+    s.timeRangeStart,
+    s.timeRangeEnd,
+    s.includeTransfers,
+  ].join('|');
+}
+
 export const recentSearchService = {
   async save(params: Omit<RecentSearch, 'id' | 'timestamp' | 'isFavorite'>): Promise<void> {
     await migrate();
     const history = await loadKey(KEY_HISTORY);
+    const sig = signatureOf(params);
+    // Retire un éventuel doublon (même gare + mêmes filtres, date ignorée) avant de ré-insérer
+    // en tête : pas de recherche identique en plusieurs exemplaires dans l'historique.
+    const deduped = history.filter((h) => signatureOf(h) !== sig);
     const entry: RecentSearch = {
       ...params,
       id: Date.now().toString(),
       timestamp: Date.now(),
       isFavorite: false,
     };
-    await saveKey(KEY_HISTORY, [entry, ...history].slice(0, MAX_HISTORY));
+    await saveKey(KEY_HISTORY, [entry, ...deduped].slice(0, MAX_HISTORY));
   },
 
   async getAll(): Promise<RecentSearch[]> {

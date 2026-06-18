@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,11 @@ import {
   TouchableOpacity,
   Linking,
   Alert,
-  Share,
   Image,
   Platform,
+  Modal,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
@@ -19,8 +20,11 @@ import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../navigation/AppNavigatorSimple';
-import { CITY_LABELS, CityLabel } from '../types';
-import { getStationData } from '../data/stationLabels';
+import { CITY_LABELS, CityLabel, TaggedPoi } from '../types';
+import { getStationData, getStationTrailsMatching } from '../data/stationLabels';
+import { modeForDistanceKm } from '../utils/directions';
+import { LocalSearchService } from '../services/localSearchService';
+import { favoriteDestinationService } from '../services/favoriteDestinationService';
 
 type DestinationDetailRouteProp = RouteProp<
   RootStackParamList,
@@ -28,10 +32,21 @@ type DestinationDetailRouteProp = RouteProp<
 >;
 type DestinationDetailNavigationProp = StackNavigationProp<RootStackParamList>;
 
+/** Lien « plus d'infos » d'un POI : son URL si dispo, sinon une recherche web (toujours cliquable). */
+function infoUrl(name: string, url?: string): string {
+  return url || `https://www.google.com/search?q=${encodeURIComponent(name)}`;
+}
+
 export default function DestinationDetailScreen() {
   const route = useRoute<DestinationDetailRouteProp>();
   const navigation = useNavigation<DestinationDetailNavigationProp>();
-  const { destination, searchDate, mapParams } = route.params;
+  const { destination, searchDate: searchDateParam, mapParams, fromFavorites } = route.params;
+  // Date consultée (modifiable sur la fiche). Défaut = date de recherche, sinon aujourd'hui.
+  // Les départs/retours et le lien SNCF s'appuient dessus → changer de jour les rafraîchit.
+  const [viewDate, setViewDate] = useState<number>(
+    searchDateParam ?? (Date.parse(destination.departure_time) || Date.now())
+  );
+  const searchDate = viewDate;
   // Android : react-native-maps n'affiche les marqueurs personnalisés que si
   // tracksViewChanges capture la vue. Un timer fixe (2s) ne suffit pas : si les
   // tuiles de la carte mettent plus longtemps à charger, le marqueur n'est pas
@@ -41,16 +56,40 @@ export default function DestinationDetailScreen() {
   const trackMarkers = Platform.OS === 'android';
   const mapRef = useRef<MapView>(null);
   const [expandedTag, setExpandedTag] = useState<CityLabel | null>(null);
-  const [showAllDepartures, setShowAllDepartures] = useState(false);
+  // Retours possibles vers la gare de départ (dans la journée)
+  const [returns, setReturns] = useState<Array<{ time: string; arrival: string; duration: number; transfers: number }> | undefined>(undefined);
+  const [showReturns, setShowReturns] = useState(false);
+  const [showAllDepartures, setShowAllDepartures] = useState(true);
   const [selectedDepartureHHMM, setSelectedDepartureHHMM] = useState<string>(
     destination.allDepartureTimes?.[0] ??
     new Date(destination.departure_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', hour12: false })
   );
 
-  const numericDestId = typeof destination.to_station_id === 'number'
-    ? destination.to_station_id
-    : parseInt(String(destination.to_station_id));
+  // IMPORTANT : résoudre les tags via le MÊME identifiant que le filtre de recherche — le code UIC
+  // (sncf_id). `to_station_id` est, pour les gares issues du GTFS, un id temporaire aléatoire qui ne
+  // résout pas → la fiche n'affichait alors aucun tag (incohérent avec la recherche).
+  const numericDestId: number | string = destination.to_station?.sncf_id || destination.to_station_id;
   const stationData = getStationData(numericDestId);
+  // Sorties à la journée (rando/vélo) rattachées à la gare d'arrivée (zéro API, géométrie embarquée).
+  // Affichées DANS le tag « Randonnée » (à pied) / « Vélo » (à vélo), comme les autres tags.
+  const trails = getStationTrailsMatching(numericDestId);
+  const trailsByTag: Record<string, typeof trails> = {
+    randonnee: trails.filter(t => t.mode === 'walk'),
+    velo: trails.filter(t => t.mode === 'bike'),
+  };
+
+  // Sauvegarde de la destination (« garder » pour reconsulter via Favoris ▸ Destinations).
+  const [isSaved, setIsSaved] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    favoriteDestinationService.isFavorite(destination).then((v) => { if (alive) setIsSaved(v); });
+    return () => { alive = false; };
+  }, [destination.to_station_id]);
+  const handleToggleSave = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const nowSaved = await favoriteDestinationService.toggle(destination);
+    setIsSaved(nowSaved);
+  };
 
   /**
    * Construit l'URL SNCF Connect avec les paramètres pré-remplis
@@ -99,6 +138,24 @@ export default function DestinationDetailScreen() {
   };
 
   const departureStation = destination.from_station ?? mapParams?.fromStation ?? null;
+
+  // Charger les retours possibles (destination → gare de départ), après l'arrivée à destination
+  // pour le DÉPART SÉLECTIONNÉ dans la plage horaire de la recherche (donc toujours après ton
+  // horaire), en respectant le choix direct/correspondance (maxTransfers). Informatif.
+  useEffect(() => {
+    let alive = true;
+    if (!departureStation) { setReturns([]); return; }
+    // Heure d'arrivée = départ choisi (dans la plage de recherche) + durée du trajet.
+    const [dh, dm] = selectedDepartureHHMM.split(':').map(Number);
+    const arrMin = dh * 60 + dm + destination.duration;
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const afterTime = `${pad(Math.floor(arrMin / 60) % 24)}:${pad(arrMin % 60)}:00`;
+    const maxTransfers = mapParams?.maxTransfers ?? 0;
+    LocalSearchService.getReturns(destination.to_station, departureStation, afterTime, maxTransfers)
+      .then((r) => { if (alive) setReturns(r); })
+      .catch(() => { if (alive) setReturns([]); });
+    return () => { alive = false; };
+  }, [destination.to_station_id, departureStation?.id, searchDate, selectedDepartureHHMM]);
 
   // Calculer la région de la carte pour afficher tous les points
   const getMapRegion = () => {
@@ -211,7 +268,28 @@ export default function DestinationDetailScreen() {
     : undefined;
 
   // Date de référence pour l'affichage (inchangée)
-  const referenceDate = new Date(destination.departure_time);
+  const referenceDate = new Date(viewDate);
+
+  // Décale la date consultée de ±n jours (plancher = aujourd'hui), rafraîchit horaires + lien SNCF.
+  const shiftViewDate = (days: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const d = new Date(viewDate);
+    d.setDate(d.getDate() + days);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (d.getTime() < today.getTime()) return;
+    setViewDate(d.getTime());
+  };
+  const isToday = (() => {
+    const d = new Date(viewDate); const t = new Date();
+    return d.toDateString() === t.toDateString();
+  })();
+
+  // Calendrier (au clic sur la date, depuis les favoris) — plancher = aujourd'hui.
+  const [showCalendar, setShowCalendar] = useState(false);
+  const minDate = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+  const onPickDate = (date?: Date) => {
+    if (date) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setViewDate(date.getTime()); }
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -244,16 +322,14 @@ export default function DestinationDetailScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.shareButton}
-              onPress={() => {
-                const name = destination.to_station.real_name || destination.to_station.name;
-                const from = destination.from_station?.name ?? '';
-                const dur = `${Math.floor(destination.duration / 60)}h${destination.duration % 60 > 0 ? `${destination.duration % 60}min` : ''}`;
-                Share.share({
-                  message: `Découvrez ${name} en train depuis ${from} (${dur}) 🚂 — réservez sur SNCF Connect`,
-                });
-              }}
+              onPress={handleToggleSave}
+              accessibilityLabel={isSaved ? 'Retirer des destinations gardées' : 'Sauvegarder cette destination'}
             >
-              <Ionicons name="share-outline" size={18} color="#5F6368" />
+              <Ionicons
+                name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                size={18}
+                color={isSaved ? '#4CAF50' : '#5F6368'}
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -295,37 +371,49 @@ export default function DestinationDetailScreen() {
                         <TouchableOpacity
                           style={[
                             styles.tagBadge,
-                            { backgroundColor: info.color + '20', borderColor: info.color },
-                            isExpanded && { backgroundColor: info.color + '40' },
+                            { backgroundColor: info.color + '22' },
+                            isExpanded && { backgroundColor: info.color + '3A' },
                           ]}
                           onPress={() => setExpandedTag(prev => prev === tagEvidence.label ? null : tagEvidence.label)}
                           activeOpacity={0.7}
                         >
-                          <Text style={[styles.tagName, { color: info.color }]}>{info.name}</Text>
+                          <Text style={styles.tagName}>{info.name}</Text>
+                          <Text style={styles.tagChevron}>{isExpanded ? '▾' : '›'}</Text>
                         </TouchableOpacity>
                         {isExpanded && (
                           <View style={[styles.tagEvidence, { borderLeftColor: info.color }]}>
-                            <Text style={styles.tagReason}>{tagEvidence.reason}</Text>
                             {tagEvidence.pois && tagEvidence.pois.length > 0 ? (
                               <View style={styles.poiList}>
-                                {tagEvidence.pois.map((poi, i) => (
-                                  poi.url ? (
-                                    <TouchableOpacity
-                                      key={`${poi.name}-${i}`}
-                                      onPress={() => Linking.openURL(poi.url!).catch(() => {})}
-                                    >
-                                      <Text style={[styles.poiLink, { color: info.color }]}>
-                                        • {poi.name} →
-                                      </Text>
-                                    </TouchableOpacity>
-                                  ) : (
-                                    <Text key={`${poi.name}-${i}`} style={styles.poiPlain}>
-                                      • {poi.name}
-                                    </Text>
-                                  )
-                                ))}
+                                {tagEvidence.pois.map((poi, i) => {
+                                  const hasCoords = poi.lat != null && poi.lon != null;
+                                  const distTxt = poi.km != null ? `~${poi.km.toFixed(1).replace('.', ',')} km` : '';
+                                  return (
+                                    <View key={`${poi.name}-${i}`} style={styles.poiItem}>
+                                      <TouchableOpacity onPress={() => Linking.openURL(infoUrl(poi.name, poi.url)).catch(() => {})}>
+                                        <Text style={[styles.poiItemName, { color: info.color }]} numberOfLines={2}>{poi.name}</Text>
+                                      </TouchableOpacity>
+                                      <View style={styles.poiItemMeta}>
+                                        {distTxt ? <Text style={styles.poiItemDist}>{distTxt}</Text> : <View />}
+                                        {hasCoords && (
+                                          <TouchableOpacity
+                                            onPress={() => navigation.navigate('RouteMap', {
+                                              origin: { lat: destination.to_station.lat, lon: destination.to_station.lon, name: destination.to_station.name },
+                                              dest: { lat: poi.lat!, lon: poi.lon!, name: poi.name },
+                                              destUrl: poi.url,
+                                              // POI rando/vélo = point seul (pas de tracé du sentier) → légende dédiée.
+                                              pointOnly: tagEvidence.label === 'randonnee' || tagEvidence.label === 'velo',
+                                              mode: modeForDistanceKm(poi.km),
+                                            })}
+                                          >
+                                            <Text style={[styles.poiItemGo, { color: info.color }]}>Voir le trajet</Text>
+                                          </TouchableOpacity>
+                                        )}
+                                      </View>
+                                    </View>
+                                  );
+                                })}
                               </View>
-                            ) : tagEvidence.source ? (
+                            ) : (tagEvidence.source && !(trailsByTag[tagEvidence.label]?.length)) ? (
                               <TouchableOpacity
                                 onPress={() => Linking.openURL(tagEvidence.source).catch(() => {})}
                               >
@@ -334,6 +422,33 @@ export default function DestinationDetailScreen() {
                                 </Text>
                               </TouchableOpacity>
                             ) : null}
+
+                            {/* Sorties à la journée (tracé embarqué) sous le tag Randonnée/Vélo */}
+                            {(trailsByTag[tagEvidence.label] || []).map((t, i) => (
+                              <View key={`trail-${i}`} style={styles.poiItem}>
+                                {t.url ? (
+                                  <TouchableOpacity onPress={() => Linking.openURL(t.url!).catch(() => {})}>
+                                    <Text style={[styles.poiItemName, { color: info.color }]} numberOfLines={2}>{t.name}</Text>
+                                  </TouchableOpacity>
+                                ) : (
+                                  <Text style={styles.poiItemName} numberOfLines={2}>{t.name}</Text>
+                                )}
+                                <View style={styles.poiItemMeta}>
+                                  <Text style={styles.poiItemDist}>{t.loop ? 'Boucle' : 'Gare → gare'} · {t.km.toFixed(0)} km</Text>
+                                  <TouchableOpacity
+                                    onPress={() => navigation.navigate('RouteMap', {
+                                      origin: { lat: destination.to_station.lat, lon: destination.to_station.lon, name: destination.to_station.name },
+                                      dest: { lat: destination.to_station.lat, lon: destination.to_station.lon, name: t.name },
+                                      mode: t.mode,
+                                      trail: t,
+                                      otherTrails: (trailsByTag[tagEvidence.label] || []).filter(o => o !== t),
+                                    })}
+                                  >
+                                    <Text style={[styles.poiItemGo, { color: info.color }]}>Voir le trajet</Text>
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
+                            ))}
                           </View>
                         )}
                       </View>
@@ -406,13 +521,72 @@ export default function DestinationDetailScreen() {
 
         {/* Horaires — timeline mise à jour selon le départ sélectionné */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Horaires pour le {referenceDate.toLocaleDateString('fr-FR', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long'
-            })}
-          </Text>
+          {fromFavorites ? (
+            // Depuis les favoris : on peut changer la date → les horaires s'adaptent.
+            <>
+              <View style={styles.dateSelector}>
+                <TouchableOpacity
+                  onPress={() => shiftViewDate(-1)}
+                  disabled={isToday}
+                  style={[styles.dateArrow, isToday && styles.dateArrowDisabled]}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="chevron-back" size={20} color={isToday ? '#B0BEC5' : '#0C3823'} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.dateLabelBtn}
+                  activeOpacity={0.7}
+                  onPress={() => setShowCalendar(true)}
+                >
+                  <Ionicons name="calendar-outline" size={16} color="#0C3823" />
+                  <Text style={styles.dateSelectorLabel}>
+                    {isToday ? "Aujourd'hui · " : ''}
+                    {referenceDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => shiftViewDate(1)}
+                  style={styles.dateArrow}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name="chevron-forward" size={20} color="#0C3823" />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.sectionSubtitle}>Touchez la date pour ouvrir le calendrier · horaires & réservation pour ce jour</Text>
+
+              {/* Calendrier natif (Android : dialog ; iOS : calendrier inline en modal) */}
+              {showCalendar && (Platform.OS === 'ios' ? (
+                <Modal transparent animationType="fade" visible onRequestClose={() => setShowCalendar(false)}>
+                  <TouchableOpacity style={styles.calendarOverlay} activeOpacity={1} onPress={() => setShowCalendar(false)}>
+                    <View style={styles.calendarSheet}>
+                      <DateTimePicker
+                        value={new Date(viewDate)}
+                        mode="date"
+                        display="inline"
+                        locale="fr-FR"
+                        minimumDate={minDate}
+                        onChange={(_e, date) => onPickDate(date)}
+                      />
+                      <TouchableOpacity style={styles.calendarDone} onPress={() => setShowCalendar(false)}>
+                        <Text style={styles.calendarDoneText}>Valider</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </TouchableOpacity>
+                </Modal>
+              ) : (
+                <DateTimePicker
+                  value={new Date(viewDate)}
+                  mode="date"
+                  minimumDate={minDate}
+                  onChange={(e, date) => { setShowCalendar(false); if (e.type !== 'dismissed') onPickDate(date); }}
+                />
+              ))}
+            </>
+          ) : (
+            <Text style={styles.sectionTitle}>
+              Horaires pour le {referenceDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </Text>
+          )}
           <View style={styles.timelineContainer}>
             {/* Départ — bleu */}
             <View style={styles.timelineItem}>
@@ -504,6 +678,44 @@ export default function DestinationDetailScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* Retours possibles dans la journée */}
+        {returns !== undefined && (
+          <View style={styles.section}>
+            {returns.length > 0 ? (
+              <>
+                <TouchableOpacity
+                  style={styles.departureSectionHeader}
+                  onPress={() => setShowReturns(v => !v)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.departureSectionTitle}>
+                    {returns.length} retour{returns.length > 1 ? 's' : ''} possible{returns.length > 1 ? 's' : ''} vers {departureStation?.name}
+                    {'  ·  '}dernier à {returns[returns.length - 1].time.replace(':', 'h')}
+                  </Text>
+                  <Text style={styles.departureChevron}>{showReturns ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+                {showReturns && (
+                  <View style={styles.departureChips}>
+                    {returns.map((r, i) => (
+                      <View key={i} style={styles.departureChip}>
+                        <Text style={styles.departureChipText}>
+                          {r.time.replace(':', 'h')}{r.transfers > 0 ? ' · corresp.' : ''}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </>
+            ) : (
+              <View style={[styles.returnCard, styles.returnCardWarn]}>
+                <Text style={styles.returnTextWarn}>
+                  Aucun train de retour trouvé — vérifiez avant de partir.
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Carte compacte */}
         <View style={styles.section}>
@@ -693,6 +905,53 @@ const styles = StyleSheet.create({
     color: '#5F6368',
     lineHeight: 18,
   },
+  poiRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  poiInfo: { flex: 1 },
+  poiAccess: {
+    fontSize: 11,
+    color: '#5F6368',
+    marginTop: 1,
+  },
+  poiGoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  poiGoText: { fontSize: 11, fontWeight: '700' },
+  // ── Point/sortie en bloc : titre (jusqu'à 2 lignes), puis distance + Voir le trajet ──
+  poiItem: {
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#EEF1F4',
+    gap: 4,
+  },
+  poiItemName: { fontSize: 14, fontWeight: '700', color: '#0C3823', lineHeight: 19 },
+  poiItemMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  poiItemDist: { fontSize: 12, color: '#5F6368' },
+  poiItemGo: { fontSize: 13, fontWeight: '700' },
+  returnCard: {
+    backgroundColor: '#E8F5E9',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  returnCardWarn: { backgroundColor: '#FFF3E0' },
+  returnTextWarn: { fontSize: 14, fontWeight: '600', color: '#E65100' },
+  returnHint: { fontSize: 12, color: '#5F6368', marginTop: 8, marginBottom: 6 },
   tagsSectionTitle: {
     fontSize: 15,
     fontWeight: '700',
@@ -700,25 +959,28 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
     gap: 8,
   },
   tagBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
-    borderWidth: 1.5,
-  },
-  tagIcon: {
-    fontSize: 14,
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 12,
   },
   tagName: {
-    fontSize: 12,
+    flex: 1,
+    fontSize: 14,
     fontWeight: '700',
+    color: '#0C3823',
+  },
+  tagChevron: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#5F6368',
+    marginLeft: 8,
   },
   tagEvidence: {
     marginTop: 6,
@@ -744,6 +1006,46 @@ const styles = StyleSheet.create({
     color: '#0C3823',
     marginBottom: 12,
   },
+  dateSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  dateArrow: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#EEF1F4',
+  },
+  dateArrowDisabled: { backgroundColor: '#F7F9FC' },
+  dateLabelBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 6, borderRadius: 8, backgroundColor: '#EEF1F4',
+  },
+  dateSelectorLabel: {
+    fontSize: 15, fontWeight: '700', color: '#0C3823',
+    textTransform: 'capitalize',
+  },
+  sectionSubtitle: { fontSize: 12, color: '#5F6368', marginTop: 4, marginBottom: 8 },
+  calendarOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: 24 },
+  calendarSheet: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12 },
+  calendarDone: {
+    backgroundColor: '#4CAF50', paddingVertical: 12, borderRadius: 12,
+    alignItems: 'center', marginTop: 8,
+  },
+  calendarDoneText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  trailRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#E8EAED',
+  },
+  trailName: { fontSize: 14, fontWeight: '700', color: '#0C3823' },
+  trailInfo: { fontSize: 12, color: '#5F6368', marginTop: 2 },
+  trailBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#4CAF50', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8,
+  },
+  trailBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+  trailCredit: { fontSize: 11, color: '#9E9E9E', marginTop: 10 },
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -16,11 +16,31 @@ import { SearchResult, CITY_LABELS } from '../types';
 import StationLabels from '../components/StationLabels';
 import { PriceEstimationService } from '../services/priceEstimationService';
 import { getStationTags } from '../data/stationLabels';
-
 type ResultsListRouteProp = RouteProp<RootStackParamList, 'ResultsList'>;
 type ResultsListNavigationProp = StackNavigationProp<RootStackParamList>;
-type SortType = 'duration' | 'departure' | 'price';
+type SortType = 'duration' | 'departure' | 'price' | 'access';
 type SortOrder = 'asc' | 'desc';
+
+// Une « envie » = un tag d'activité de la gare + la distance (vol d'oiseau) du POI le plus proche.
+type Envie = { key: string; name: string; icon: string; color: string; km: number | null };
+
+function getEnvies(stationId: number): Envie[] {
+  return getStationTags(stationId).map((t) => {
+    const info = CITY_LABELS[t.label] || { name: t.label, icon: '•', color: '#4CAF50' };
+    let km: number | null = null;
+    for (const p of t.pois ?? []) {
+      if (p.km == null) continue;
+      if (km == null || p.km < km) km = p.km;
+    }
+    return { key: t.label, name: info.name, icon: info.icon, color: info.color, km };
+  });
+}
+
+// Score de proximité d'une gare : distance min (vol d'oiseau) de l'activité la plus proche.
+function accessScore(stationId: number): number | null {
+  const kms = getEnvies(stationId).map((e) => e.km).filter((k): k is number => k != null);
+  return kms.length ? Math.min(...kms) : null;
+}
 
 export default function ResultsListScreen() {
   const route = useRoute<ResultsListRouteProp>();
@@ -29,7 +49,11 @@ export default function ResultsListScreen() {
   const { fromStation, results, mode, maxValue, searchDate, maxTransfers } = route.params;
   const [sortType, setSortType] = useState<SortType>('duration');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [accessibleOnly, setAccessibleOnly] = useState(false);
   const listRef = useRef<FlatList>(null);
+
+  const toNumId = (r: SearchResult) =>
+    typeof r.to_station_id === 'number' ? r.to_station_id : parseInt(String(r.to_station_id));
 
   const handleSortChange = (newSortType: SortType) => {
     if (newSortType === sortType) {
@@ -51,6 +75,11 @@ export default function ResultsListScreen() {
       const aMax = a.priceRange?.max ?? a.price ?? 0;
       const bMax = b.priceRange?.max ?? b.price ?? 0;
       comparison = aMax - bMax;
+    } else if (sortType === 'access') {
+      // Les gares avec activité atteignable d'abord (durée min), les autres ensuite
+      const aS = accessScore(toNumId(a)) ?? Infinity;
+      const bS = accessScore(toNumId(b)) ?? Infinity;
+      comparison = aS - bS;
     } else {
       comparison = new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime();
     }
@@ -58,6 +87,12 @@ export default function ResultsListScreen() {
     // Inverser si ordre décroissant
     return sortOrder === 'asc' ? comparison : -comparison;
   });
+
+  // Filtre « accessible à pied/vélo » : une gare est accessible si elle a des tags
+  // (les tags non atteignables sont élagués à la génération → présence = accessibilité).
+  const displayedResults = accessibleOnly
+    ? sortedResults.filter((r) => getStationTags(toNumId(r)).length > 0)
+    : sortedResults;
 
   const handleDestinationPress = (destination: SearchResult) => {
     navigation.navigate('DestinationDetail', {
@@ -68,8 +103,8 @@ export default function ResultsListScreen() {
   };
 
   const renderDestinationItem = ({ item }: { item: SearchResult }) => {
-    const numId = typeof item.to_station_id === 'number' ? item.to_station_id : parseInt(String(item.to_station_id));
-    const tags = getStationTags(numId);
+    const numId = toNumId(item);
+    const envies = getEnvies(numId);
 
     return (
       <TouchableOpacity
@@ -116,15 +151,19 @@ export default function ResultsListScreen() {
             </View>
           )}
         </View>
-        {tags.length > 0 && (
-          <View style={styles.tagRow}>
-            {tags.map(t => (
-              <View key={t.label} style={[styles.tagChip, { borderColor: CITY_LABELS[t.label].color }]}>
-                <Text style={[styles.tagChipText, { color: CITY_LABELS[t.label].color }]}>
-                  {CITY_LABELS[t.label].name}
-                </Text>
-              </View>
+        {envies.length > 0 && (
+          <View style={styles.enviesBox}>
+            <Text style={styles.enviesTitle}>Ce que vous pouvez faire ici</Text>
+            {envies.slice(0, 3).map((e) => (
+              <Text key={e.key} style={styles.envieLine} numberOfLines={1}>
+                <Text style={{ color: e.color }}>● </Text>
+                {e.name}
+                {e.km != null ? `  ·  à ~${e.km.toFixed(1).replace('.', ',')} km` : ''}
+              </Text>
             ))}
+            {envies.length > 3 && (
+              <Text style={styles.envieMore}>+{envies.length - 3} autre{envies.length - 3 > 1 ? 's' : ''}</Text>
+            )}
           </View>
         )}
       </TouchableOpacity>
@@ -139,7 +178,7 @@ export default function ResultsListScreen() {
           <Text style={styles.headerTitle}>Depuis {fromStation.name}</Text>
           <View style={styles.headerRow}>
             <Text style={styles.headerSubtitle}>
-              {sortedResults.length} destination{sortedResults.length > 1 ? 's' : ''} trouvée{sortedResults.length > 1 ? 's' : ''}
+              {displayedResults.length} destination{displayedResults.length > 1 ? 's' : ''} trouvée{displayedResults.length > 1 ? 's' : ''}
             </Text>
             {mode === 'time' && maxValue && (
               <Text style={styles.headerCriteria}>
@@ -206,7 +245,7 @@ export default function ResultsListScreen() {
                   sortType === 'departure' && styles.sortButtonTextActive,
                 ]}
               >
-                Heure de départ
+                Départ
               </Text>
               {sortType === 'departure' && (
                 <Text
@@ -248,21 +287,49 @@ export default function ResultsListScreen() {
               )}
             </View>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.sortButton, sortType === 'access' && styles.sortButtonActive]}
+            onPress={() => handleSortChange('access')}
+          >
+            <View style={styles.sortButtonContent}>
+              <Text style={[styles.sortButtonText, sortType === 'access' && styles.sortButtonTextActive]}>
+                Proximité
+              </Text>
+              {sortType === 'access' && (
+                <Text style={[styles.sortArrow, styles.sortArrowActive]}>
+                  {sortOrder === 'asc' ? '↑' : '↓'}
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
         </View>
+
+        {/* Filtre accessibilité */}
+        <TouchableOpacity
+          style={[styles.filterChip, accessibleOnly && styles.filterChipActive]}
+          onPress={() => setAccessibleOnly((v) => !v)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.filterChipText, accessibleOnly && styles.filterChipTextActive]}>
+            🚶 Accessible à pied/vélo {accessibleOnly ? '✓' : ''}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Liste des résultats */}
-      {sortedResults.length === 0 ? (
+      {displayedResults.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>Aucune destination trouvée</Text>
           <Text style={styles.emptySubtext}>
-            Essayez de modifier vos critères de recherche
+            {accessibleOnly
+              ? 'Aucune destination avec activité accessible à pied/vélo. Désactivez le filtre pour tout voir.'
+              : 'Essayez de modifier vos critères de recherche'}
           </Text>
         </View>
       ) : (
         <FlatList
           ref={listRef}
-          data={sortedResults}
+          data={displayedResults}
           renderItem={renderDestinationItem}
           keyExtractor={(item, index) => `result-${item.to_station_id}-${item.duration}-${index}`}
           contentContainerStyle={styles.listContent}
@@ -490,5 +557,52 @@ const styles = StyleSheet.create({
   tagChipText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  enviesBox: {
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#EEF1F4',
+    gap: 3,
+  },
+  enviesTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#9AA0A6',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 2,
+  },
+  envieLine: {
+    fontSize: 13,
+    color: '#0C3823',
+    fontWeight: '500',
+  },
+  envieMore: {
+    fontSize: 12,
+    color: '#5F6368',
+    marginTop: 1,
+  },
+  filterChip: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#E8EAED',
+    backgroundColor: '#F7F9FC',
+  },
+  filterChipActive: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#E8F5E9',
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#5F6368',
+  },
+  filterChipTextActive: {
+    color: '#2E7D32',
   },
 });

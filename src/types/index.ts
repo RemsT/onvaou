@@ -1,41 +1,61 @@
 // Types pour l'application ONvaOU
 
-export type CityLabel =
-  | 'plage-mer'
-  | 'montagne'
-  | 'lacs-rivieres'
-  | 'sports-hiver'
-  | 'randonnee'
-  | 'culture-histoire'
-  | 'gastronomie'
-  | 'kid-friendly';
+// ──────────────────────────────────────────────────────────────────────────
+// Registre de tags UNIQUE (source de vérité) : src/config/tags.json
+// Consommé par l'app (ci-dessous) ET le script de génération
+// (scripts/generate-tags.js). Ajouter un tag = ajouter une entrée JSON,
+// aucun code à modifier ici. Voir le plan v2 / CLAUDE.md.
+// ──────────────────────────────────────────────────────────────────────────
+import tagsConfig from '../config/tags.json';
 
-export const CITY_LABELS: Record<CityLabel, { name: string; icon: string; color: string }> = {
-  'plage-mer': { name: 'Baignade', icon: '🏊', color: '#56CCF2' },
-  'montagne': { name: 'Montagne', icon: '⛰️', color: '#8B7355' },
-  'lacs-rivieres': { name: 'Lacs & Rivières', icon: '🏊', color: '#3FA7D6' },
-  'sports-hiver': { name: 'Sports d\'hiver', icon: '⛷️', color: '#AED9E0' },
-  'randonnee': { name: 'Randonnée', icon: '🥾', color: '#95E1D3' },
-  'culture-histoire': { name: 'Culture & Histoire', icon: '🏛️', color: '#F38181' },
-  'gastronomie': { name: 'Gastronomie', icon: '🍽️', color: '#FFA07A' },
-  'kid-friendly': { name: 'Famille', icon: '👨‍👩‍👧‍👦', color: '#FF6B6B' },
-};
+// Une clé de tag (ex: 'plage-mer'). Dérivée du registre — pas une union figée
+// pour rester extensible (l'app n'a aucun switch exhaustif sur ces clés).
+export type CityLabel = string;
 
-// Les 8 tags exposés dans l'UI de filtrage
-export const UI_LABELS: CityLabel[] = [
-  'plage-mer',
-  'montagne',
-  'lacs-rivieres',
-  'sports-hiver',
-  'randonnee',
-  'culture-histoire',
-  'gastronomie',
-  'kid-friendly',
-];
+export interface TagDisplay {
+  name: string;
+  icon: string;
+  color: string;
+}
+
+// Affichage (nom/icône/couleur) construit depuis le registre.
+export const CITY_LABELS: Record<string, TagDisplay> = Object.fromEntries(
+  (tagsConfig as Array<{ key: string; name: string; icon: string; color: string }>).map((t) => [
+    t.key,
+    { name: t.name, icon: t.icon, color: t.color },
+  ])
+);
+
+// Tags exposés dans l'UI de filtrage (ordre du registre).
+export const UI_LABELS: CityLabel[] = (tagsConfig as Array<{ key: string }>).map((t) => t.key);
 
 export interface TaggedPoi {
-  name: string;   // Nom du lieu (ex: "Zoo de la Flèche")
-  url?: string;   // Lien officiel si disponible
+  name: string;            // Nom du lieu (ex: "Zoo de la Flèche")
+  url?: string;            // Lien officiel si disponible
+  lat?: number;            // Coordonnées du POI (itinéraire exact)
+  lon?: number;
+  mode?: 'walk' | 'bike';  // Mode d'accès retenu (à pied / vélo)
+  minutes?: number;        // Durée réelle (min) dans ce mode
+  km?: number;             // Distance réelle (km) dans ce mode
+  ascent?: number;         // Dénivelé positif (m) — effort vélo
+  route?: [number, number][]; // Tracé SIMPLIFIÉ [lat,lon] (~10-12 pts) pour l'aperçu in-app
+}
+
+/**
+ * Sortie à la journée (randonnée à pied ou tour à vélo) rattachée à une gare, PRÉ-CALCULÉE
+ * hors-ligne et embarquée (aucun appel API au runtime). Voir scripts/generate-trails.js.
+ * `geom` = polyligne encodée précision 6 (décodable par decodePolyline6 de routingService.ts).
+ */
+export interface Trail {
+  name: string;
+  mode: 'walk' | 'bike';
+  loop: boolean;            // true = boucle (départ ≈ arrivée), false = linéaire gare → gare
+  km: number;              // longueur du tracé
+  minutes: number;         // durée estimée (depuis la longueur)
+  accessKm: number;        // distance vol d'oiseau gare → départ du tracé
+  toUic?: string;          // pour les linéaires : gare d'arrivée (sortie gare → gare)
+  url?: string;            // lien cliquable « plus d'infos » (site officiel ou relation OSM)
+  geom: string;            // polyligne encodée précision 6
 }
 
 export interface TagEvidence {

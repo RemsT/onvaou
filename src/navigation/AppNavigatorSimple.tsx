@@ -5,14 +5,16 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Station, SearchResult } from '../types';
+import { Station, SearchResult, Trail } from '../types';
 
 import HomeScreen from '../screens/HomeScreenSimple';
 import ResultsListScreen from '../screens/ResultsListScreen';
 import MapScreen from '../screens/MapScreenSimple';
 import FavoritesScreen from '../screens/FavoritesScreenSimple';
 import DestinationDetailScreen from '../screens/DestinationDetailScreenSimple';
+import RouteMapScreen from '../screens/RouteMapScreen';
 import HistoriqueScreen from '../screens/HistoriqueScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 import OnboardingScreen, { ONBOARDING_KEY } from '../screens/OnboardingScreen';
 
 // Paramètres du stack de recherche (onglet Rechercher)
@@ -37,6 +39,8 @@ export type RootStackParamList = {
   DestinationDetail: {
     destination: SearchResult;
     searchDate?: number;
+    // true = ouvert depuis Favoris ▸ Destinations → autorise le changement de date/heure.
+    fromFavorites?: boolean;
     mapParams?: {
       fromStation: Station;
       results: SearchResult[];
@@ -44,6 +48,17 @@ export type RootStackParamList = {
       maxValue?: number;
       maxTransfers?: number;
     };
+  };
+  RouteMap: {
+    origin: { lat: number; lon: number; name: string };
+    dest: { lat: number; lon: number; name: string };
+    destUrl?: string;   // lien « voir le site » de l'activité (marqueur destination cliquable)
+    pointOnly?: boolean; // activité rando/vélo connue seulement par un point (pas de tracé de sentier)
+    mode?: 'walk' | 'bike';
+    // Mode « rando/vélo » : trace la géométrie embarquée du tracé (zéro API) + ses infos.
+    trail?: Trail;
+    // Autres parcours du même mode accessibles depuis la gare (traits fins cliquables).
+    otherTrails?: Trail[];
   };
 };
 
@@ -57,6 +72,7 @@ type TabParamList = {
   Rechercher: undefined;
   Favoris: undefined;
   Historique: undefined;
+  Profil: undefined;
 };
 
 const SearchStack = createStackNavigator<RootStackParamList>();
@@ -94,6 +110,11 @@ function SearchNavigator() {
         component={DestinationDetailScreen}
         options={{ title: 'Destination', ...HEADER_OPTIONS }}
       />
+      <SearchStack.Screen
+        name="RouteMap"
+        component={RouteMapScreen}
+        options={{ title: 'Itinéraire', ...HEADER_OPTIONS }}
+      />
     </SearchStack.Navigator>
   );
 }
@@ -120,6 +141,7 @@ function MainTabs() {
             Rechercher: ['search', 'search-outline'],
             Favoris: ['heart', 'heart-outline'],
             Historique: ['time', 'time-outline'],
+            Profil: ['options', 'options-outline'],
           };
           const [active, inactive] = icons[route.name] ?? ['ellipse', 'ellipse-outline'];
           return <Ionicons name={(focused ? active : inactive) as any} size={24} color={color} />;
@@ -129,6 +151,7 @@ function MainTabs() {
       <Tab.Screen name="Rechercher" component={SearchNavigator} />
       <Tab.Screen name="Favoris" component={FavoritesScreen} />
       <Tab.Screen name="Historique" component={HistoriqueScreen} />
+      <Tab.Screen name="Profil" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }

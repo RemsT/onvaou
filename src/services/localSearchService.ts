@@ -1,7 +1,7 @@
 import { Station, SearchResult, CityLabel } from '../types';
 import { frenchStations } from '../data/frenchStations';
 import { LocationService } from './locationService';
-import { getStationLabels, countLabelMatches } from '../data/stationLabels';
+import { getStationLabels, getTrailPrefsVersion } from '../data/stationLabels';
 import { PriceEstimationService } from './priceEstimationService';
 import { gtfsDbEnhanced, JourneyWithTransfer } from './gtfsDatabaseServiceEnhanced';
 
@@ -345,6 +345,9 @@ export class LocalSearchService {
       maxTransfers,
       selectedLabels: selectedLabels ? [...selectedLabels].sort() : [],
       searchDate: searchDate ? searchDate.toISOString().slice(0, 10) : undefined,
+      // Les critères de profil (plages rando/vélo, type, durée) modifient quelles destinations
+      // portent le tag rando/vélo → invalider le cache quand ils changent.
+      prefsV: getTrailPrefsVersion(),
     });
 
     if (this.searchCache.has(cacheKey)) {
@@ -900,20 +903,22 @@ export class LocalSearchService {
         r.to_station?.sncf_id || r.to_station_id;
 
       if (selectedLabels && selectedLabels.length > 0) {
+        // Précalcule labels + nombre de correspondances UNE fois par résultat (évite O(n log n)
+        // appels redondants à getStationData dans le comparateur de tri).
+        const matchCount = new Map<SearchResult, number>();
         results = results.filter(r => {
           const labels = getStationLabels(tagKey(r));
-          if (labelFilterMode === 'AND') return selectedLabels.every(l => labels.includes(l));
-          return selectedLabels.some(l => labels.includes(l));
+          const ok = labelFilterMode === 'AND'
+            ? selectedLabels.every(l => labels.includes(l))
+            : selectedLabels.some(l => labels.includes(l));
+          if (ok) matchCount.set(r, labels.filter(l => selectedLabels.includes(l)).length);
+          return ok;
         });
 
-        // Trier par nombre de labels correspondants, puis par durée
+        // Trier par nombre de labels correspondants (précalculé), puis par durée
         results.sort((a, b) => {
-          const matchesA = countLabelMatches(tagKey(a), selectedLabels);
-          const matchesB = countLabelMatches(tagKey(b), selectedLabels);
-          if (matchesB !== matchesA) {
-            return matchesB - matchesA;
-          }
-          return a.duration - b.duration;
+          const diff = (matchCount.get(b) ?? 0) - (matchCount.get(a) ?? 0);
+          return diff !== 0 ? diff : a.duration - b.duration;
         });
       } else {
         // Trier par durée croissante
@@ -934,6 +939,70 @@ export class LocalSearchService {
   /**
    * Convertit un horaire HH:MM en minutes depuis minuit
    */
+  /**
+   * Liste des trains de retour possibles depuis la gare de destination vers la gare de départ,
+   * partant APRÈS l'heure d'arrivée, en respectant le choix direct/correspondance de la recherche.
+   * @param fromStation gare de destination (on repart de là)
+   * @param toStation   gare de départ d'origine (on y retourne)
+   * @param afterTime   heure plancher au format "HH:MM:SS" (heure d'arrivée à destination)
+   * @param maxTransfers 0 = directs uniquement, >=1 = directs + correspondances
+   * @returns liste triée + dédupliquée par heure de départ
+   */
+  static async getReturns(
+    fromStation: Station,
+    toStation: Station,
+    afterTime: string,
+    maxTransfers: number = 0
+  ): Promise<Array<{ time: string; arrival: string; duration: number; transfers: number }>> {
+    try {
+      if (!fromStation.sncf_id || !toStation.sncf_id) return [];
+      await gtfsDbEnhanced.initialize();
+      const fromId = await this.findGTFSStopId(fromStation.sncf_id);
+      const toId = await this.findGTFSStopId(toStation.sncf_id);
+      if (!fromId || !toId) return [];
+
+      const raw: Array<{ time: string; arrival: string; duration: number; transfers: number }> = [];
+
+      if (maxTransfers <= 0) {
+        const conns = await gtfsDbEnhanced.findDirectConnections(fromId, toId, afterTime, '23:59:59', 200);
+        for (const c of conns as any[]) {
+          if (!c.departure_time) continue;
+          raw.push({
+            time: c.departure_time.slice(0, 5),
+            arrival: c.arrival_time ? c.arrival_time.slice(0, 5) : '',
+            duration: c.arrival_time ? this.calculateDuration(c.departure_time, c.arrival_time) : 0,
+            transfers: 0,
+          });
+        }
+      } else {
+        const journeys = await gtfsDbEnhanced.findAllJourneys(fromId, toId, afterTime, maxTransfers);
+        for (const j of journeys) {
+          const legs = j.legs;
+          if (!legs || legs.length === 0 || !legs[0].departure_time) continue;
+          const dep = legs[0].departure_time;
+          const arr = legs[legs.length - 1].arrival_time;
+          raw.push({
+            time: dep.slice(0, 5),
+            arrival: arr ? arr.slice(0, 5) : '',
+            duration: j.totalDuration || (arr ? this.calculateDuration(dep, arr) : 0),
+            transfers: Math.max(0, legs.length - 1),
+          });
+        }
+      }
+
+      // Dédupliquer par heure de départ (garder le plus court), trier, limiter
+      const byTime = new Map<string, { time: string; arrival: string; duration: number; transfers: number }>();
+      for (const r of raw) {
+        const ex = byTime.get(r.time);
+        if (!ex || r.duration < ex.duration) byTime.set(r.time, r);
+      }
+      return [...byTime.values()].sort((a, b) => a.time.localeCompare(b.time)).slice(0, 30);
+    } catch (e) {
+      errorLog('[LocalSearchService] getReturns:', e);
+      return [];
+    }
+  }
+
   private static timeToMinutes(time: string): number {
     const [hours, minutes] = time.split(':').map(Number);
     return hours * 60 + minutes;
