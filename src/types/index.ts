@@ -39,6 +39,8 @@ export interface TaggedPoi {
   km?: number;             // Distance réelle (km) dans ce mode
   ascent?: number;         // Dénivelé positif (m) — effort vélo
   route?: [number, number][]; // Tracé SIMPLIFIÉ [lat,lon] (~10-12 pts) pour l'aperçu in-app
+  stars?: number;          // Classement (camping) : 1-5 étoiles ; absent = non classé
+  commune?: string;        // Commune (camping) pour l'affichage
 }
 
 /**

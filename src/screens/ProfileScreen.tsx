@@ -80,10 +80,24 @@ export default function ProfileScreen() {
       <SafeTopBand />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.pageTitle}>Profil</Text>
-        <Text style={styles.pageSubtitle}>Sorties à la journée</Text>
-        <Text style={styles.subtitle}>
-          Ces critères s'appliquent quand tu coches Randonnée ou Vélo dans une recherche.
-        </Text>
+        <Text style={styles.pageSubtitle}>Tes préférences de recherche</Text>
+
+        <Text style={[styles.sectionHeader, styles.sectionHeaderFirst]}>Général</Text>
+        <Text style={styles.sectionHint}>S'appliquent à tous les centres d'intérêt.</Text>
+
+        {/* Temps max pour rejoindre un centre d'intérêt — appliqué aux deux modes (à pied / à vélo) */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Temps max pour rejoindre un centre d'intérêt</Text>
+          <SingleSlider
+            min={5} max={60} step={5}
+            value={prefs.maxAccessMinutes}
+            onChange={(v) => update({ ...prefs, maxAccessMinutes: v })}
+            format={(n) => `${n} min`}
+          />
+        </View>
+
+        <Text style={styles.sectionHeader}>Randonnée & Vélo</Text>
+        <Text style={styles.sectionHint}>Sorties à la journée.</Text>
 
         {/* Randonnée */}
         <View style={styles.card}>
@@ -121,18 +135,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Temps de marche max — appliqué UNIQUEMENT en mode « à pied » */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Temps de marche max (mode à pied)</Text>
-          <Text style={styles.cardHint}>Distance max à pied vers un site, prise en compte seulement si tu cherches « à pied ».</Text>
-          <SingleSlider
-            min={5} max={60} step={5}
-            value={prefs.maxWalkMinutes}
-            onChange={(v) => update({ ...prefs, maxWalkMinutes: v })}
-            format={(n) => `${n} min`}
-          />
-        </View>
-
         {/* Durée max — curseur de Aucune à 6 h (par heure) */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Durée estimée max du tour</Text>
@@ -142,6 +144,29 @@ export default function ProfileScreen() {
             onChange={(v) => update({ ...prefs, maxMinutes: v === 0 ? null : v })}
             format={(n) => (n === 0 ? 'Aucune limite' : `${n / 60} h`)}
           />
+        </View>
+
+        <Text style={styles.sectionHeader}>Camping</Text>
+
+        {/* Camping — étoiles minimum + inclure les non classés */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Camping — étoiles minimum</Text>
+          <SingleSlider
+            min={0} max={5} step={1}
+            value={prefs.campingMinStars}
+            onChange={(v) => update({ ...prefs, campingMinStars: v })}
+            format={(n) => (n === 0 ? 'Indifférent' : `≥ ${n}★`)}
+          />
+          <TouchableOpacity
+            style={styles.toggleRow}
+            activeOpacity={0.8}
+            onPress={() => update({ ...prefs, campingIncludeUnrated: !prefs.campingIncludeUnrated })}
+          >
+            <View style={[styles.checkbox, prefs.campingIncludeUnrated && styles.checkboxOn]}>
+              {prefs.campingIncludeUnrated && <Text style={styles.checkboxMark}>✓</Text>}
+            </View>
+            <Text style={styles.toggleLabel}>Inclure les campings non classés</Text>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={styles.resetBtn} onPress={() => update(DEFAULT_PREFERENCES)} activeOpacity={0.8}>
@@ -157,7 +182,10 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 40 },
   pageTitle: { fontSize: 24, fontWeight: '800', color: '#0C3823', textAlign: 'center' },
   pageSubtitle: { fontSize: 16, fontWeight: '600', color: '#4CAF50', textAlign: 'center', marginTop: 2 },
-  subtitle: { fontSize: 13, color: '#5F6368', marginTop: 8, marginBottom: 8, lineHeight: 18, textAlign: 'center' },
+  // En-têtes de groupe (Général / Randonnée & Vélo / Camping) + sous-libellé court.
+  sectionHeader: { fontSize: 13, fontWeight: '800', color: '#0C3823', marginTop: 22, marginBottom: 2, letterSpacing: 0.5, textTransform: 'uppercase' },
+  sectionHeaderFirst: { marginTop: 12 },
+  sectionHint: { fontSize: 12, color: '#5F6368', marginBottom: 2 },
   card: {
     backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginTop: 12,
     borderWidth: 1, borderColor: '#E8EAED', gap: 10,
@@ -190,4 +218,13 @@ const styles = StyleSheet.create({
   segBtnTextActive: { color: '#0C3823', fontWeight: '700' },
   resetBtn: { marginTop: 18, alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 20 },
   resetText: { fontSize: 14, fontWeight: '600', color: '#9E9E9E' },
+  // Toggle « inclure les non classés » : case à cocher + libellé.
+  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
+  checkbox: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: '#C5CAD1',
+    alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF',
+  },
+  checkboxOn: { backgroundColor: '#4CAF50', borderColor: '#4CAF50' },
+  checkboxMark: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', lineHeight: 16 },
+  toggleLabel: { fontSize: 14, color: '#0C3823', flex: 1 },
 });

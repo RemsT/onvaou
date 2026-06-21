@@ -68,5 +68,15 @@
     "radiusKm": 10,
     "minReachable": 1,
     "noun": "parcs de loisirs/zoos"
+  },
+  {
+    "key": "camping",
+    "name": "Camping",
+    "icon": "🏕️",
+    "color": "#6D4C41",
+    "datatourismeClasses": [],
+    "radiusKm": 10,
+    "minReachable": 1,
+    "noun": "campings"
   }
 ]

@@ -64,6 +64,31 @@ de vélo ». Le filtre fin (minutes réelles via Valhalla) s'applique ensuite au
 Côté app, le seuil marche/vélo suggéré est aussi dans `src/utils/directions.ts`
 (`WALK_SUGGEST_KM = 2`).
 
+## Campings (`generate-campings.js`)
+
+Rattache les **campings** aux gares, **100 % hors-ligne, zéro API runtime**. Même source et même
+CSV que `generate-tags.js` (`/tmp/dt_place.csv`), même grille spatiale 0,1° + `haversine`.
+
+```bash
+# Mêmes prérequis que ci-dessus (CSV DATAtourisme en /tmp/dt_place.csv)
+node scripts/generate-campings.js        # → src/data/campingsGenerated.ts (REMPLACE le fichier)
+npx tsc --noEmit && npm test
+```
+
+- Ne garde que les POI de classe **`CampingAndCaravanning`** (col Categories).
+- **Étoiles** extraites de `Classements_du_POI` (col 11) via `parseStars` (regex `/(\d+)\s*étoiles?/i`,
+  miroir du helper testé `src/services/profilePreferencesService.ts`) ; **commune** = col 5.
+- Rattache un camping à une gare si distance vol d'oiseau ≤ `RADIUS_KM` (10 km) ; cap `TOP` (6) par
+  gare, triés **étoiles décroissantes puis distance**.
+- Le filtre **★ minimum / inclure non classés** (Profil) et le plafond **mode à pied** (temps de
+  marche max) sont appliqués au **runtime** (`stationLabels.ts` + `campingMatches`), pas ici.
+- Test rapide : `node scripts/generate-campings.js --limit 20`.
+
+| Constante | Valeur | Rôle |
+|---|---|---|
+| `RADIUS_KM` | 10 | rayon de rattachement (vol d'oiseau), cohérent avec `tags.json` `camping.radiusKm` |
+| `TOP` | 6 | nombre de campings gardés par gare (étoiles ↓ puis distance ↑) |
+
 ## Sorties à la journée — randonnée & vélo (`generate-trails.js`)
 
 Module « sorties à la journée » (rando à pied / tour à vélo depuis une gare), **100 % hors-ligne,

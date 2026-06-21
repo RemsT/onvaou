@@ -2,11 +2,13 @@ import { CityLabel, StationData, TagEvidence, Trail, UI_LABELS } from '../types'
 import { allStations } from './allStations';
 import { generatedLabels } from './stationLabelsGenerated';
 import { generatedTrails } from './trailsGenerated';
+import { generatedCampings } from './campingsGenerated';
 import {
   TrailPreferences,
   DEFAULT_PREFERENCES,
   trailMatchesPreferences,
-  walkMinutesToKm,
+  accessMinutesToKm,
+  campingMatches,
 } from '../services/profilePreferencesService';
 
 const UI_LABELS_SET = new Set<CityLabel>(UI_LABELS);
@@ -801,14 +803,13 @@ export function getTravelMode(): 'walk' | 'bike' {
   return currentTravelMode;
 }
 
-// Un tour est-il VISIBLE selon TOUS les filtres actifs : plages km, type, durée max (profil) ET le
-// mode de déplacement (en « à pied » : pas de vélo, et accès ≤ temps de marche max du profil).
+// Un tour est-il VISIBLE selon TOUS les filtres actifs : plages km, type, durée max (profil), le
+// mode de déplacement (en « à pied » : pas de vélo) ET le temps max pour rejoindre le départ du
+// tour (converti en distance selon le mode).
 function trailVisible(t: Trail): boolean {
   if (!trailMatchesPreferences(t, currentPrefs)) return false;
-  if (currentTravelMode === 'walk') {
-    if (t.mode !== 'walk') return false;
-    if (t.accessKm > walkMinutesToKm(currentPrefs.maxWalkMinutes)) return false;
-  }
+  if (currentTravelMode === 'walk' && t.mode !== 'walk') return false;
+  if (t.accessKm > accessMinutesToKm(currentPrefs.maxAccessMinutes, currentTravelMode)) return false;
   return true;
 }
 
@@ -846,6 +847,22 @@ export function getStationData(idOrSncf: number | string): StationData | null {
     tags = [...tags, trailTag('velo', 'à vélo')];
   }
 
+  // Camping : injecter le tag si la gare a ≥ 1 camping conforme aux préférences (étoiles min /
+  // inclure non classés). POIs triés étoiles décroissantes puis distance (déjà ordonnés à la génération).
+  if (UI_LABELS_SET.has('camping')) {
+    const campings = (generatedCampings[uic] || []).filter(c => campingMatches(c, currentPrefs));
+    if (campings.length) {
+      tags = [...tags, {
+        label: 'camping',
+        reason: 'Campings accessibles depuis la gare',
+        source: 'https://www.datatourisme.fr/',
+        linkLabel: 'DATAtourisme',
+        confidence: 90,
+        pois: campings,
+      }];
+    }
+  }
+
   // Fusion des tags de même label (ex. après fusion Baignade + Lacs/Rivières une gare peut avoir
   // 2 tags 'plage-mer') : on garde un seul tag par label et on combine ses POIs (dédup par nom).
   const merged = new Map<CityLabel, TagEvidence>();
@@ -860,16 +877,15 @@ export function getStationData(idOrSncf: number | string): StationData | null {
   }
   tags = [...merged.values()];
 
-  // Mode « à pied » : masquer Vélo et ne garder que les sites accessibles ≤ temps de marche max
-  // du profil (les tags descriptifs sans POIs restent ; ceux dont tous les POIs sont hors rayon
-  // sont retirés). Sans effet en mode « à vélo ».
-  if (currentTravelMode === 'walk') {
-    const capKm = walkMinutesToKm(currentPrefs.maxWalkMinutes);
-    tags = tags
-      .filter(t => t.label !== 'velo')
-      .map(t => (t.pois && t.pois.length ? { ...t, pois: t.pois.filter(p => p.km == null || p.km <= capKm) } : t))
-      .filter(t => !(t.pois && t.pois.length === 0));
-  }
+  // Plafond d'accès (les DEUX modes) : ne garder que les sites atteignables dans le temps max pour
+  // rejoindre un centre d'intérêt, converti en distance selon le mode (à pied ~4 km/h, à vélo
+  // ~13 km/h). Les tags descriptifs sans POIs restent ; ceux dont tous les POIs sont hors rayon
+  // sont retirés. En mode « à pied », le tag Vélo est en plus masqué.
+  const capKm = accessMinutesToKm(currentPrefs.maxAccessMinutes, currentTravelMode);
+  tags = tags
+    .filter(t => !(currentTravelMode === 'walk' && t.label === 'velo'))
+    .map(t => (t.pois && t.pois.length ? { ...t, pois: t.pois.filter(p => p.km == null || p.km <= capKm) } : t))
+    .filter(t => !(t.pois && t.pois.length === 0));
 
   const result: StationData | null = (!data && tags.length === 0) ? null : { ...(data ?? { tags: [] }), tags };
   stationDataCache.set(uic, result);

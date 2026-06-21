@@ -387,11 +387,20 @@ export default function DestinationDetailScreen() {
                                 {tagEvidence.pois.map((poi, i) => {
                                   const hasCoords = poi.lat != null && poi.lon != null;
                                   const distTxt = poi.km != null ? `~${poi.km.toFixed(1).replace('.', ',')} km` : '';
+                                  // Camping : étoiles (★) ou « non classé », + commune si dispo.
+                                  const isCamping = tagEvidence.label === 'camping';
+                                  const starsTxt = isCamping
+                                    ? (poi.stars ? '★'.repeat(poi.stars) : 'Non classé')
+                                    : '';
+                                  const subTxt = isCamping
+                                    ? [starsTxt, poi.commune].filter(Boolean).join(' · ')
+                                    : '';
                                   return (
                                     <View key={`${poi.name}-${i}`} style={styles.poiItem}>
                                       <TouchableOpacity onPress={() => Linking.openURL(infoUrl(poi.name, poi.url)).catch(() => {})}>
                                         <Text style={[styles.poiItemName, { color: info.color }]} numberOfLines={2}>{poi.name}</Text>
                                       </TouchableOpacity>
+                                      {subTxt ? <Text style={styles.poiItemSub}>{subTxt}</Text> : null}
                                       <View style={styles.poiItemMeta}>
                                         {distTxt ? <Text style={styles.poiItemDist}>{distTxt}</Text> : <View />}
                                         {hasCoords && (
@@ -936,6 +945,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   poiItemName: { fontSize: 14, fontWeight: '700', color: '#0C3823', lineHeight: 19 },
+  poiItemSub: { fontSize: 12, color: '#8A6D3B', marginTop: 2, fontWeight: '600' },
   poiItemMeta: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,6 +1,6 @@
 {
   "name": "onvaou",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "main": "index.js",
   "scripts": {
     "start": "expo start",
@@ -9,7 +9,8 @@
     "web": "expo start --web",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "set-version": "node scripts/set-version.js"
   },
   "jest": {
     "preset": "jest-expo",
