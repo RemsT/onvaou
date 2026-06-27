@@ -323,7 +323,7 @@ export class LocalSearchService {
     timeRangeEnd?: string,
     searchDate?: Date,
     maxTransfers: number = 1,
-    labelFilterMode: 'OR' | 'AND' = 'OR'
+    labelFilterMode: 'OR' | 'AND' = 'AND'
   ): Promise<SearchResult[]> {
     debugLog('========================================');
     debugLog('[LocalSearchService] 🔍 RECHERCHE DÉMARRÉE');
@@ -411,7 +411,7 @@ export class LocalSearchService {
     timeRangeEnd?: string,
     searchDate?: Date,
     maxTransfers: number = 1,
-    labelFilterMode: 'OR' | 'AND' = 'OR'
+    labelFilterMode: 'OR' | 'AND' = 'AND'
   ): Promise<SearchResult[]> {
     debugLog('[LocalSearchService] 🚂 Recherche avec horaires GTFS réels');
     debugLog(`[LocalSearchService] 📅 Filtres: maxTime=${maxTime}min, maxBudget=${maxBudget}€`);

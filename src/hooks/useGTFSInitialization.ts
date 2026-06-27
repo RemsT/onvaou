@@ -8,6 +8,7 @@ import {
   type InitializationProgress
 } from '../services/gtfsInitializationService';
 import { tariffService } from '../services/tariffService';
+import { initContentDatabase } from '../services/contentDatabaseService';
 
 interface UseGTFSInitializationReturn {
   isInitializing: boolean;
@@ -40,6 +41,10 @@ export const useGTFSInitialization = (): UseGTFSInitializationReturn => {
 
   const initializeDatabase = async (forceReset: boolean = false, forceDownload: boolean = false) => {
     try {
+      // Base « contenu » (labels/trails/campings) — indépendante du GTFS, requise par stationLabels.
+      // Awaitée AVANT toute recherche ; en cas d'échec, repli automatique sur les .ts (non bloquant).
+      await initContentDatabase();
+
       // Forcer la suppression si demandé
       if (forceReset) {
         console.log('🔄 Suppression forcée de la base de données...');

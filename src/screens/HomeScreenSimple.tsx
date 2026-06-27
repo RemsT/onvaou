@@ -48,7 +48,8 @@ export default function HomeScreen() {
   const [stationSuggestions, setStationSuggestions] = useState<Station[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedLabels, setSelectedLabels] = useState<CityLabel[]>([]);
-  const [labelFilterMode, setLabelFilterMode] = useState<'OR' | 'AND'>('OR');
+  // Défaut ET : plusieurs centres d'intérêt = chaque résultat doit TOUS les avoir (ex. baignade + vélo).
+  const [labelFilterMode, setLabelFilterMode] = useState<'OR' | 'AND'>('AND');
   // Mode de déplacement : « à pied » masque le tag Vélo et borne les sites au temps de marche (profil).
   const [travelMode, setTravelModeState] = useState<'walk' | 'bike'>('bike');
   const applyTravelMode = (m: 'walk' | 'bike') => {
@@ -106,7 +107,7 @@ export default function HomeScreen() {
     setMaxBudget(recent.maxBudget);
     setSelectedDate(recent.selectedDate ? new Date(recent.selectedDate) : null);
     setSelectedLabels(recent.selectedLabels);
-    setLabelFilterMode(recent.labelFilterMode ?? 'OR');
+    setLabelFilterMode(recent.labelFilterMode ?? 'AND');
     setTimeRangeStart(recent.timeRangeStart);
     setTimeRangeEnd(recent.timeRangeEnd);
     setDirectOnly(recent.includeTransfers ?? false);

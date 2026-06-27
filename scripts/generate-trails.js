@@ -35,17 +35,20 @@ const LIMIT = (() => { const i = process.argv.indexOf('--limit'); return i >= 0 
 const MODE = argMode === 'bike' ? 'bike' : 'walk';
 
 // ── Réglages ──────────────────────────────────────────────────────────────────
-const ACCESS_MAX_KM = { walk: 2, bike: 4 };       // accès gare → tracé (vol d'oiseau)
+// Élargi (« Large ») pour des tracés bien plus exhaustifs. Généreux à la génération : le runtime
+// re-borne par le profil (« temps max pour rejoindre un centre d'intérêt », F2) + F1/SQLite encaisse
+// le volume sans alourdir le démarrage.
+const ACCESS_MAX_KM = { walk: 4, bike: 8 };       // accès gare → tracé (vol d'oiseau)
 const SPEED_KMH = { walk: 4, bike: 15 };          // vitesse pour la durée estimée
 const MIN_KM = { walk: 1, bike: 3 };              // longueur min (sous laquelle on ignore)
 const MAX_KM = { walk: 30, bike: 100 };           // longueur max — au-delà, on DÉCOUPE une section
 const LOOP_CLOSE_KM = 0.3;                         // extrémités proches ⇒ boucle
-// Pour les LINÉAIRES : walk = priorité gare → gare ; bike = rattaché au point le plus proche
-// (les longues véloroutes ne passent près que d'UNE gare → on en propose une section roulable).
-const LINEAR_VIA_NEAREST = { walk: false, bike: true };
+// LINÉAIRES rattachés à la gare la plus proche (pied ET vélo) + découpe d'une section ≤ MAX_KM.
+// (Avant, pied exigeait gare→gare → ~96 % des randos jetées. Gros déblocage d'exhaustivité.)
+const LINEAR_VIA_NEAREST = { walk: true, bike: true };
 const SIMPLIFY_TOL_M = 25;                          // tolérance Douglas-Peucker (mètres)
-// Tracés gardés par gare (après dédup par nom). Vélo = beaucoup pour la variété (« tous les goûts »).
-const TOP_TRAILS = { walk: 8, bike: 40 };
+// Tracés gardés par gare (après dédup par osm_id/nom). Plafonds relevés pour la variété.
+const TOP_TRAILS = { walk: 25, bike: 60 };
 const OUT = path.join(__dirname, '..', 'src', 'data', 'trailsGenerated.ts');
 
 function haversine(lat1, lon1, lat2, lon2) {
@@ -203,6 +206,30 @@ function main() {
     return '';
   };
 
+  // ── Métadonnées OSM (Phase 1 — données riches) ──────────────────────────────
+  // sac_scale → échelle de difficulté T1–T6 (rando) ; network → portée du réseau ; popularité = proxy.
+  const SAC_TO_T = {
+    hiking: 'T1', mountain_hiking: 'T2', demanding_mountain_hiking: 'T3',
+    alpine_hiking: 'T4', demanding_alpine_hiking: 'T5', difficult_alpine_hiking: 'T6',
+  };
+  const NET_RANK = { iwn: 4, icn: 4, nwn: 3, ncn: 3, rwn: 2, rcn: 2, lwn: 1, lcn: 1 };
+  const cleanStr = (v) => (v == null || v === '' ? undefined : String(v));
+  const difficultyFromProps = (p) => SAC_TO_T[(p.sac_scale || '').toLowerCase().trim()] || undefined;
+  const activityFromProps = (p) => {
+    const route = (p.route || '').toLowerCase();
+    if (MODE === 'bike') return route === 'mtb' ? 'mtb' : 'bike';
+    return route === 'foot' ? 'foot' : 'hiking';
+  };
+  // Proxy de popularité (faute de notes) : portée du réseau + balisage/ref + lien Wikidata/site.
+  const popularityFromProps = (p) => {
+    let s = (NET_RANK[(p.network || '').toLowerCase().trim()] || 0) * 18;
+    if (p.ref) s += 16;
+    if (p.wikidata || p.wikipedia) s += 12;
+    if (p.website || p.url) s += 8;
+    if (p['osmc-symbol'] || p.symbol) s += 6;
+    return Math.min(100, s);
+  };
+
   const MINKM = MIN_KM[MODE], MAXKM = MAX_KM[MODE];
   const addTrail = (uic, usePts, loop, accessKm, toUic) => {
     const k = lengthKm(usePts);
@@ -211,7 +238,15 @@ function main() {
     push(uic, {
       name: addTrail._name, mode: MODE, loop, km: +k.toFixed(1),
       minutes: Math.round((k / SPEED_KMH[MODE]) * 60), accessKm: +accessKm.toFixed(1),
-      ...(toUic ? { toUic } : {}), ...(addTrail._url ? { url: addTrail._url } : {}), geom,
+      ...(toUic ? { toUic } : {}), ...(addTrail._url ? { url: addTrail._url } : {}),
+      // Données riches OSM (champs optionnels) — n'apparaissent que si présentes dans la source.
+      ...(addTrail._ref ? { ref: addTrail._ref } : {}),
+      ...(addTrail._network ? { network: addTrail._network } : {}),
+      ...(addTrail._activity ? { activity: addTrail._activity } : {}),
+      ...(addTrail._difficulty ? { difficulty: addTrail._difficulty } : {}),
+      ...(addTrail._popularity ? { popularity: addTrail._popularity } : {}),
+      geom,
+      ...(addTrail._osmId ? { __osm: addTrail._osmId } : {}), // transient (dédup), retiré à l'écriture
     });
     kept++;
   };
@@ -221,9 +256,17 @@ function main() {
 
   let kept = 0;
   for (const f of features) {
-    addTrail._name = (f.properties && (f.properties.name || f.properties.nom || f.properties.ref)) || 'Itinéraire';
+    const props = f.properties || {};
+    addTrail._name = (props.name || props.nom || props.ref) || 'Itinéraire';
     if (EXCLUDE_NAME.test(addTrail._name)) continue; // circuit-jeu, pas une rando/un tour vélo
-    addTrail._url = urlFor(f.properties);
+    addTrail._url = urlFor(props);
+    // Métadonnées riches OSM portées sur le tracé (ref, réseau, activité, difficulté, popularité).
+    addTrail._ref = cleanStr(props.ref);
+    addTrail._network = cleanStr(props.network);
+    addTrail._activity = activityFromProps(props);
+    addTrail._difficulty = difficultyFromProps(props);
+    addTrail._popularity = popularityFromProps(props);
+    addTrail._osmId = cleanStr(props.osm_id || props['@id'] || props.id);
     for (const raw of featureLines(f.geometry)) {
       if (raw.length < 2) continue;
       const pts = simplify(raw, SIMPLIFY_TOL_M);
@@ -267,18 +310,20 @@ function main() {
       }
     } catch { /* fichier vide/stub → on repart à zéro */ }
   }
-  // Ajoute les tracés du mode courant : dédup par NOM (évite les segments répétés d'une même
-  // véloroute), puis on garde les plus proches jusqu'au plafond du mode (variété « tous les goûts »).
+  // Ajoute les tracés du mode courant : dédup par identifiant OSM (sinon par nom) — évite les segments
+  // répétés d'une même relation. On garde les plus proches jusqu'au plafond du mode (« tous les goûts »).
+  // Le champ transient __osm sert UNIQUEMENT à la dédup, il est retiré avant l'écriture.
   const cap = TOP_TRAILS[MODE];
   for (const [uic, list] of byStation) {
     list.sort((x, y) => x.accessKm - y.accessKm);
     const seen = new Set();
     const current = [];
     for (const t of list) {
-      const key = t.name.toLowerCase().trim();
+      const key = t.__osm || t.name.toLowerCase().trim();
       if (seen.has(key)) continue;
       seen.add(key);
-      current.push(t);
+      const { __osm, ...clean } = t; // retire le champ transient de dédup
+      current.push(clean);
       if (current.length >= cap) break;
     }
     out[uic] = [...(out[uic] || []), ...current];

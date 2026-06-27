@@ -6,6 +6,10 @@ import { useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigatorSimple';
 import { openDirections, isBeyondBikeCap, MAX_BIKE_MIN } from '../utils/directions';
 import { fetchRoute, RouteResult, decodePolyline6 } from '../services/routingService';
+import { estimateMinutes } from '../utils/effort';
+import { shareTrailGpx } from '../utils/shareGpx';
+import { networkLabel, difficultyLabel } from '../utils/trailMeta';
+import ElevationProfile from '../components/ElevationProfile';
 
 type RouteMapRouteProp = RouteProp<RootStackParamList, 'RouteMap'>;
 
@@ -18,6 +22,11 @@ export default function RouteMapScreen() {
   // tout le reste du composant s'appuie dessus.
   const [activeTrail, setActiveTrail] = useState(paramTrail);
   const trail = activeTrail;
+
+  // Durée corrigée par le dénivelé (Naismith/Tobler) : vaut la durée à plat tant que le D+ (ascent)
+  // n'est pas généré, puis s'ajuste automatiquement quand l'enrichissement SRTM l'aura renseigné.
+  const trailMinutes = trail ? estimateMinutes(trail.mode, trail.km, trail.ascent) : 0;
+  const [exporting, setExporting] = useState(false);
 
   // Mode « rando/vélo » : géométrie EMBARQUÉE du tracé (zéro API), décodée une fois.
   const trailCoords = useMemo(() => (trail ? decodePolyline6(trail.geom) : null), [trail]);
@@ -247,9 +256,17 @@ export default function RouteMapScreen() {
           <Text style={styles.trailTitle} numberOfLines={2}>
             {trail.mode === 'bike' ? '🚴' : '🥾'} {trail.name}
           </Text>
+          {(trail.generated || trail.ref || networkLabel(trail.network) || difficultyLabel(trail.difficulty)) ? (
+            <Text style={styles.trailMeta}>
+              {[trail.generated ? 'Boucle suggérée' : trail.ref, networkLabel(trail.network), difficultyLabel(trail.difficulty)].filter(Boolean).join(' · ')}
+            </Text>
+          ) : null}
           <Text style={styles.trailMeta}>
-            {trail.loop ? 'Boucle' : 'Linéaire'} · {trail.km.toFixed(1).replace('.', ',')} km · ~{trail.minutes} min
+            {trail.loop ? 'Boucle' : 'Linéaire'} · {trail.km.toFixed(1).replace('.', ',')} km · ~{trailMinutes} min{trail.ascent != null ? ` · ↗ ${trail.ascent} m` : ''}{trail.descent != null ? ` ↘ ${trail.descent} m` : ''}
           </Text>
+          {trail.profile && trail.profile.length > 1 ? (
+            <ElevationProfile profile={trail.profile} color={trail.mode === 'bike' ? '#00838F' : '#43A047'} />
+          ) : null}
           <Text style={styles.trailMeta}>
             Accès depuis {origin.name} · ~{trail.accessKm.toFixed(1).replace('.', ',')} km
           </Text>
@@ -295,7 +312,7 @@ export default function RouteMapScreen() {
         {trail ? (
           /* Mode rando/vélo : infos du tracé (le mode est fixé par la rando) */
           <View style={styles.timeRow}>
-            <Text style={styles.timeBig}>~{trail.minutes} min</Text>
+            <Text style={styles.timeBig}>~{trailMinutes} min</Text>
             <Text style={styles.footerHint}>
               {trail.mode === 'bike' ? 'à vélo' : 'à pied'} · {trail.km.toFixed(1).replace('.', ',')} km
               {' · '}{trail.loop ? 'boucle' : 'gare → gare'}
@@ -368,6 +385,22 @@ export default function RouteMapScreen() {
             {trail ? 'Aller au départ' : 'Lancer la navigation'}
           </Text>
         </TouchableOpacity>
+
+        {/* Export GPX (mode trail) — partage cross-plateforme iOS/Android via la feuille native. */}
+        {trail && (
+          <TouchableOpacity
+            style={styles.btnSecondary}
+            activeOpacity={0.85}
+            disabled={exporting}
+            onPress={async () => {
+              setExporting(true);
+              try { await shareTrailGpx(trail); } catch {} finally { setExporting(false); }
+            }}
+          >
+            <Ionicons name="download-outline" size={16} color="#0C3823" />
+            <Text style={styles.btnSecondaryText}>{exporting ? 'Export…' : 'Exporter en GPX'}</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -441,4 +474,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50', paddingVertical: 13, borderRadius: 12, marginTop: 2,
   },
   btnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  btnSecondary: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#FFFFFF', borderWidth: 1.5, borderColor: '#4CAF50',
+    paddingVertical: 11, borderRadius: 12, marginTop: 8,
+  },
+  btnSecondaryText: { color: '#0C3823', fontSize: 14, fontWeight: '700' },
 });

@@ -89,11 +89,67 @@ npx tsc --noEmit && npm test
 | `RADIUS_KM` | 10 | rayon de rattachement (vol d'oiseau), cohérent avec `tags.json` `camping.radiusKm` |
 | `TOP` | 6 | nombre de campings gardés par gare (étoiles ↓ puis distance ↑) |
 
+## Élévation / D+ (`enrich-trails-elevation.js`) — Phase 2
+
+Enrichit `src/data/trailsGenerated.ts` avec l'altitude depuis **SRTM 30 m** (tuiles publiques AWS
+« skadi », **sans clé**, hors-ligne au build — aucun appel runtime).
+
+```bash
+node scripts/enrich-trails-elevation.js   # (alias : npm run enrich-elevation)
+npm run build-content                      # IMPORTANT ensuite
+```
+
+- Pour chaque tracé : décode la geom → **densifie ~100 m** → échantillonne l'altitude → **D+/D-** avec
+  **filtre anti-bruit** (seuil 10 m, sinon SRTM surestime) → profil downsamplé (24 pts) → **durée
+  Naismith** recalculée → **niveau d'effort** (Facile→Difficile) à défaut de `sac_scale`.
+- Tuiles mises en cache dans `/tmp/srtm` (≈ tuiles France touchées par les tracés).
+- Libs pures testables : `scripts/lib/elevation.js` (maths) + `scripts/lib/srtm.js` (sampler).
+  Affichage : `src/components/ElevationProfile.tsx` (mini-graphe barres, sans dépendance native).
+
+## Base contenu SQLite (`build-content-db.js`) — F1, allègement
+
+Sort les données générées (`stationLabelsGenerated` / `trailsGenerated` / `campingsGenerated`, ~9 Mo)
+du **bundle JS** (où elles sont parsées à CHAQUE lancement → RAM + démarrage) vers un fichier SQLite
+**interrogé à la demande par UIC**.
+
+```bash
+npm run build-content        # → assets/content.db + src/data/contentDbVersion.ts
+```
+
+- 3 tables (`labels`/`trails`/`campings`), 1 ligne par UIC, valeur = JSON. `meta.version` = empreinte.
+- **À relancer après chaque régénération** des données (`generate-tags`, `generate-trails`,
+  `generate-campings`).
+- Runtime : `src/services/contentDatabaseService.ts` copie l'asset sous `SQLite/content-<version>.db`
+  (nom versionné → recopie auto après mise à jour) puis l'ouvre en **sync** (`getFirstSync`). Repli
+  paresseux sur les `.ts` en environnement Node/test. Init awaitée dans `useGTFSInitialization`.
+- État : **labels + trails + campings** tous servis par la base (aucun import statique des `.ts` dans
+  l'app — fusion labels faite **par UIC** dans `stationLabels.ts`). `getStationData` reste synchrone.
+- Nécessite `better-sqlite3` (devDep, build-time uniquement). `metro.config.js` traite `.db` en asset.
+
 ## Sorties à la journée — randonnée & vélo (`generate-trails.js`)
 
 Module « sorties à la journée » (rando à pied / tour à vélo depuis une gare), **100 % hors-ligne,
 aucun appel API au runtime** : les tracés, longueurs, durées et associations gares sont
 pré-calculés et embarqués (`src/data/trailsGenerated.ts`).
+
+**Source des tracés (Phase 1 — données riches)** : flux WFS **magOSM** (relations OSM, ODbL), qui
+porte les tags utiles (`ref`, `network`, `sac_scale`, `osm_id`, `wikidata`, `website`…). Télécharger
+les GeoJSON (EPSG:4326) puis générer :
+
+```bash
+# Rando (foot routes) → /tmp/rando.geojson  ·  Vélo/VTT → /tmp/velo.geojson
+curl -sL "https://magosm.magellium.com/geoserver/wfs?request=GetFeature&version=2.0.0&count=500000&outputFormat=application/json&typeName=magosm:hiking_foot_routes_line&srsName=EPSG:4326" -o /tmp/rando.geojson
+curl -sL "https://magosm.magellium.com/geoserver/wfs?request=GetFeature&version=2.0.0&count=500000&outputFormat=application/json&typeName=magosm:bicycle_mtb_routes_line&srsName=EPSG:4326" -o /tmp/velo.geojson
+node --max-old-space-size=4096 scripts/generate-trails.js --mode walk --in /tmp/rando.geojson
+node --max-old-space-size=4096 scripts/generate-trails.js --mode bike --in /tmp/velo.geojson
+npm run build-content   # IMPORTANT : régénère assets/content.db
+```
+
+**Champs enrichis** portés sur chaque `Trail` (optionnels) : `ref` (ex. « GR 65 », « EV6 »),
+`network` (portée iwn/nwn/rwn/lwn ou icn/ncn/rcn/lcn), `activity`, `difficulty` (T1–T6 depuis
+`sac_scale`, rare dans OSM → surtout via le D+ en Phase 2), `popularity` (proxy de tri : portée du
+réseau + ref + balisage + Wikidata/site). **Dédup par `osm_id`** (sinon par nom). Affichage :
+badges ref/réseau/difficulté + tri « populaire d'abord » (`src/utils/trailMeta.ts`).
 
 **Sources (ouvertes, France, licence ODbL — attribution « © contributeurs OpenStreetMap »
 obligatoire dans l'app) :**

@@ -189,7 +189,7 @@ describe('résolution d\'identifiant (robustesse base évolutive)', () => {
 
 describe('intégrité des données', () => {
   it('tous les tags ont un label valide dans CITY_LABELS', () => {
-    const { stationLabels } = require('../src/data/stationLabels');
+    const stationLabels = require('../src/data/stationLabels').getAllStationData();
     const { CITY_LABELS } = require('../src/types');
     const validLabels = Object.keys(CITY_LABELS);
     // Labels retirés du registre mais dont les données restent (filtrées au runtime).
@@ -203,7 +203,7 @@ describe('intégrité des données', () => {
   });
 
   it('tous les tags ont reason, source et linkLabel non vides', () => {
-    const { stationLabels } = require('../src/data/stationLabels');
+    const stationLabels = require('../src/data/stationLabels').getAllStationData();
     Object.entries(stationLabels).forEach(([id, data]: [string, any]) => {
       data.tags.forEach((t: any) => {
         expect(t.reason).toBeTruthy();
@@ -214,7 +214,7 @@ describe('intégrité des données', () => {
   });
 
   it('confidence est entre 0 et 100', () => {
-    const { stationLabels } = require('../src/data/stationLabels');
+    const stationLabels = require('../src/data/stationLabels').getAllStationData();
     Object.entries(stationLabels).forEach(([id, data]: [string, any]) => {
       data.tags.forEach((t: any) => {
         expect(t.confidence).toBeGreaterThanOrEqual(0);

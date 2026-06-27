@@ -1,8 +1,13 @@
 import { CityLabel, StationData, TagEvidence, Trail, UI_LABELS } from '../types';
 import { allStations } from './allStations';
-import { generatedLabels } from './stationLabelsGenerated';
-import { generatedTrails } from './trailsGenerated';
-import { generatedCampings } from './campingsGenerated';
+// labels / trails / campings : servis par la base SQLite « contenu » (F1) — sortis du bundle JS au
+// démarrage. Fusion labels générées + curation manuelle faite PAR UIC (plus de map complète en RAM).
+import {
+  getGeneratedTrails,
+  getGeneratedCampings,
+  getGeneratedLabels,
+  getAllGeneratedLabels,
+} from '../services/contentDatabaseService';
 import {
   TrailPreferences,
   DEFAULT_PREFERENCES,
@@ -705,29 +710,35 @@ const manualLabels: Record<string, StationData> = {
  * on garde la description/source curée ET on AJOUTE les tags générés : la fusion par label de
  * getStationData combine alors « reason » curé + POIs générés (donc « Voir le trajet » partout).
  */
-function mergeStationData(
-  gen: Record<string, StationData>,
-  man: Record<string, StationData>,
-): Record<string, StationData> {
+// Fusion d'UNE gare : labels générées (g) + curation manuelle (m). On garde le SET de tags curé,
+// mais on attache les POIs générés (coordonnées → « Voir le trajet ») au tag manuel de même label
+// quand il n'en a pas. Pas de tag ajouté. (Logique identique à l'ancienne fusion en bloc.)
+function mergeOneStationData(g: StationData | null, m: StationData | undefined): StationData | null {
+  if (!g) return m ?? null;
+  if (!m) return g;
+  const tags = m.tags.map((mt) => {
+    // Rando/vélo : pas de POIs DATAtourisme (points sans longueur) ; restent descriptifs.
+    if (mt.label === 'randonnee' || mt.label === 'velo') return mt;
+    if (mt.pois && mt.pois.length) return mt;
+    const gt = g.tags.find((t) => t.label === mt.label && t.pois && t.pois.length);
+    return gt ? { ...mt, pois: gt.pois } : mt;
+  });
+  return { ...g, ...m, tags };
+}
+
+/**
+ * Carte COMPLÈTE fusionnée (toutes gares) — construite à la demande pour les diagnostics/tests.
+ * PAS appelée au runtime sur device : getStationData fusionne par UIC, donc les ~4,4 Mo de labels
+ * générées ne sont jamais chargés en bloc en production.
+ */
+export function getAllStationData(): Record<string, StationData> {
+  const gen = getAllGeneratedLabels();
   const out: Record<string, StationData> = { ...gen };
-  for (const [uic, m] of Object.entries(man)) {
-    const g = gen[uic];
-    if (!g) { out[uic] = m; continue; }
-    // On garde le SET de tags curé, mais on attache les POIs générés (avec coordonnées →
-    // « Voir le trajet ») au tag manuel de même label quand il n'en a pas. Pas de tag ajouté.
-    const tags = m.tags.map((mt) => {
-      // Rando/vélo : pas de POIs DATAtourisme (points sans longueur) ; restent descriptifs.
-      if (mt.label === 'randonnee' || mt.label === 'velo') return mt;
-      if (mt.pois && mt.pois.length) return mt;
-      const gt = g.tags.find((t) => t.label === mt.label && t.pois && t.pois.length);
-      return gt ? { ...mt, pois: gt.pois } : mt;
-    });
-    out[uic] = { ...g, ...m, tags };
+  for (const [uic, m] of Object.entries(manualLabels)) {
+    out[uic] = mergeOneStationData(gen[uic] ?? null, m)!;
   }
   return out;
 }
-
-export const stationLabels: Record<string, StationData> = mergeStationData(generatedLabels, manualLabels);
 
 // ─── Résolution d'identifiant (robuste aux évolutions de la base) ───────────
 //
@@ -824,7 +835,8 @@ export function getStationData(idOrSncf: number | string): StationData | null {
   const cached = stationDataCache.get(uic);
   if (cached !== undefined) return cached;
 
-  const data = stationLabels[uic];
+  // Fusion PAR UIC (labels générées depuis la base contenu + curation manuelle) — pas de map globale.
+  const data = mergeOneStationData(getGeneratedLabels(uic), manualLabels[uic]);
   // Ne conserver que les tags de la liste exposée dans l'UI.
   // Sous 'randonnee'/'velo', on retire les POIs DATAtourisme (des POINTS sans longueur — leur « km »
   // est la distance, pas la longueur de la sortie ; ex. visites audioguidées) qui ne respectent pas
@@ -836,7 +848,7 @@ export function getStationData(idOrSncf: number | string): StationData | null {
     : [];
 
   // Injecter les tags rando/vélo si la gare a ≥ 1 tour VISIBLE (critères profil + mode de déplacement).
-  const trails = generatedTrails[uic] || [];
+  const trails = getGeneratedTrails(uic);
   const hasWalk = trails.some(t => t.mode === 'walk' && trailVisible(t));
   const hasBike = trails.some(t => t.mode === 'bike' && trailVisible(t));
   if (hasWalk && !tags.some(t => t.label === 'randonnee') && UI_LABELS_SET.has('randonnee')) {
@@ -850,7 +862,7 @@ export function getStationData(idOrSncf: number | string): StationData | null {
   // Camping : injecter le tag si la gare a ≥ 1 camping conforme aux préférences (étoiles min /
   // inclure non classés). POIs triés étoiles décroissantes puis distance (déjà ordonnés à la génération).
   if (UI_LABELS_SET.has('camping')) {
-    const campings = (generatedCampings[uic] || []).filter(c => campingMatches(c, currentPrefs));
+    const campings = getGeneratedCampings(uic).filter(c => campingMatches(c, currentPrefs));
     if (campings.length) {
       tags = [...tags, {
         label: 'camping',
@@ -899,7 +911,7 @@ export function getStationLabels(idOrSncf: number | string): CityLabel[] {
 /** Sorties à la journée rattachées à une gare. Vide tant que les données ne sont pas générées. */
 export function getStationTrails(idOrSncf: number | string): Trail[] {
   const uic = resolveUic(idOrSncf);
-  return (uic && generatedTrails[uic]) || [];
+  return uic ? getGeneratedTrails(uic) : [];
 }
 
 /** Sorties rattachées à une gare VISIBLES (critères profil + mode de déplacement). */
@@ -914,7 +926,7 @@ export function getStationTags(idOrSncf: number | string): TagEvidence[] {
 export function filterStationsByLabels(
   stationIds: (number | string)[],
   labels: CityLabel[],
-  mode: 'OR' | 'AND' = 'OR'
+  mode: 'OR' | 'AND' = 'AND'
 ): (number | string)[] {
   if (labels.length === 0) return stationIds;
   return stationIds.filter(id => {

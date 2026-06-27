@@ -56,7 +56,7 @@ export class HybridSearchService {
     timeRangeStart?: string,
     timeRangeEnd?: string,
     maxTransfers: number = 1,
-    labelFilterMode: 'OR' | 'AND' = 'OR'
+    labelFilterMode: 'OR' | 'AND' = 'AND'
   ): Promise<SearchResult[]> {
     // Utilisation des données locales uniquement (APIs désactivées temporairement)
     console.log('Utilisation des données locales avec estimation des prix');

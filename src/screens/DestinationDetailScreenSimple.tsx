@@ -23,6 +23,7 @@ import { RootStackParamList } from '../navigation/AppNavigatorSimple';
 import { CITY_LABELS, CityLabel, TaggedPoi } from '../types';
 import { getStationData, getStationTrailsMatching } from '../data/stationLabels';
 import { modeForDistanceKm } from '../utils/directions';
+import { networkLabel, difficultyLabel, summarizeWaypoints } from '../utils/trailMeta';
 import { LocalSearchService } from '../services/localSearchService';
 import { favoriteDestinationService } from '../services/favoriteDestinationService';
 
@@ -73,9 +74,12 @@ export default function DestinationDetailScreen() {
   // Sorties à la journée (rando/vélo) rattachées à la gare d'arrivée (zéro API, géométrie embarquée).
   // Affichées DANS le tag « Randonnée » (à pied) / « Vélo » (à vélo), comme les autres tags.
   const trails = getStationTrailsMatching(numericDestId);
+  // Tri « les meilleurs d'abord » : popularité (réseau/balisage/ref) décroissante, puis accès.
+  const byPopularity = (a: typeof trails[number], b: typeof trails[number]) =>
+    (b.popularity ?? 0) - (a.popularity ?? 0) || a.accessKm - b.accessKm;
   const trailsByTag: Record<string, typeof trails> = {
-    randonnee: trails.filter(t => t.mode === 'walk'),
-    velo: trails.filter(t => t.mode === 'bike'),
+    randonnee: trails.filter(t => t.mode === 'walk').sort(byPopularity),
+    velo: trails.filter(t => t.mode === 'bike').sort(byPopularity),
   };
 
   // Sauvegarde de la destination (« garder » pour reconsulter via Favoris ▸ Destinations).
@@ -442,8 +446,23 @@ export default function DestinationDetailScreen() {
                                 ) : (
                                   <Text style={styles.poiItemName} numberOfLines={2}>{t.name}</Text>
                                 )}
+                                {(t.generated || t.ref || networkLabel(t.network) || difficultyLabel(t.difficulty)) ? (
+                                  <View style={styles.trailBadges}>
+                                    {t.generated ? (
+                                      <Text style={styles.trailGenBadge}>Boucle suggérée</Text>
+                                    ) : null}
+                                    {t.ref ? (
+                                      <Text style={[styles.trailRefBadge, { color: info.color, borderColor: info.color }]}>{t.ref}</Text>
+                                    ) : null}
+                                    {networkLabel(t.network) ? <Text style={styles.trailMetaTag}>{networkLabel(t.network)}</Text> : null}
+                                    {difficultyLabel(t.difficulty) ? <Text style={styles.trailMetaTag}>{difficultyLabel(t.difficulty)}</Text> : null}
+                                  </View>
+                                ) : null}
+                                {summarizeWaypoints(t.waypoints) ? (
+                                  <Text style={styles.trailWaypoints}>Le long : {summarizeWaypoints(t.waypoints)}</Text>
+                                ) : null}
                                 <View style={styles.poiItemMeta}>
-                                  <Text style={styles.poiItemDist}>{t.loop ? 'Boucle' : 'Gare → gare'} · {t.km.toFixed(0)} km</Text>
+                                  <Text style={styles.poiItemDist}>{t.loop ? 'Boucle' : 'Gare → gare'} · {t.km.toFixed(0)} km{t.ascent ? ` · ↗ ${t.ascent} m` : ''}</Text>
                                   <TouchableOpacity
                                     onPress={() => navigation.navigate('RouteMap', {
                                       origin: { lat: destination.to_station.lat, lon: destination.to_station.lon, name: destination.to_station.name },
@@ -953,6 +972,21 @@ const styles = StyleSheet.create({
   },
   poiItemDist: { fontSize: 12, color: '#5F6368' },
   poiItemGo: { fontSize: 13, fontWeight: '700' },
+  // Badges « données riches » (Phase 1) : ref (GR/EuroVelo), portée du réseau, difficulté.
+  trailBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  trailRefBadge: {
+    fontSize: 11, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 2,
+    borderRadius: 6, borderWidth: 1.5,
+  },
+  trailMetaTag: {
+    fontSize: 11, fontWeight: '600', color: '#5F6368', backgroundColor: '#EEF1F4',
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+  },
+  trailWaypoints: { fontSize: 12, color: '#5F6368', marginTop: 3 },
+  trailGenBadge: {
+    fontSize: 11, fontWeight: '700', color: '#7B5800', backgroundColor: '#FFF3D6',
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
+  },
   returnCard: {
     backgroundColor: '#E8F5E9',
     borderRadius: 12,

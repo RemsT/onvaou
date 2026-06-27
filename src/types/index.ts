@@ -53,11 +53,59 @@ export interface Trail {
   mode: 'walk' | 'bike';
   loop: boolean;            // true = boucle (départ ≈ arrivée), false = linéaire gare → gare
   km: number;              // longueur du tracé
-  minutes: number;         // durée estimée (depuis la longueur)
+  minutes: number;         // durée estimée (Naismith/Tobler une fois le D+ connu, sinon vitesse plate)
   accessKm: number;        // distance vol d'oiseau gare → départ du tracé
   toUic?: string;          // pour les linéaires : gare d'arrivée (sortie gare → gare)
   url?: string;            // lien cliquable « plus d'infos » (site officiel ou relation OSM)
   geom: string;            // polyligne encodée précision 6
+  // ── Champs enrichis (optionnels, rétro-compatibles) — voir feuille de route rando/vélo v2 ──
+  ref?: string;            // ex. "GR 65", "EV6" (depuis OSM)
+  network?: string;        // portée du réseau : lwn/rwn/nwn/iwn (rando) ou lcn/rcn/ncn/icn (vélo)
+  activity?: 'hiking' | 'foot' | 'bike' | 'mtb';
+  surface?: number;        // % de revêtement « naturel » (dérivé des tags OSM)
+  ascent?: number;         // D+ (m) — SRTM, profil lissé
+  descent?: number;        // D- (m)
+  profile?: number[];      // profil altimétrique downsamplé (~20-30 pts) pour l'affichage
+  difficulty?: string;     // sac_scale (T1-T6) / mtb:scale + indice IBP
+  popularity?: number;     // proxy de tri (multi-réseaux, Wikidata, richesse des tags)
+  waypoints?: { name: string; type: string; km: number; lat: number; lon: number }[]; // POIs le long
+  generated?: boolean;     // true = boucle SUGGÉRÉE (générée par routing, pas un itinéraire OSM balisé)
+}
+
+// ── Itinérance multi-jours (graphe d'étapes) ────────────────────────────────
+// Nœuds = gares + hébergements ; arêtes = un segment faisable en UNE journée.
+export interface Accommodation {
+  id: string;
+  name: string;
+  type: 'refuge' | 'gite' | 'cabane' | 'camping';
+  lat: number;
+  lon: number;
+  uic?: string;             // renseigné si l'hébergement est (proche d') une gare
+  season?: string;          // période d'ouverture (refuges.info / OSM opening_hours)
+  reservationPhone?: string;
+  reservationUrl?: string;
+}
+
+export interface StageEdge {
+  fromId: string;           // id de nœud (uic de gare ou id d'hébergement)
+  toId: string;
+  mode: 'walk' | 'bike';
+  km: number;
+  ascent: number;
+  minutes: number;
+  geom: string;             // polyligne encodée précision 6
+  water?: { km: number; lat: number; lon: number }[];                 // points d'eau le long
+  resupply?: { name: string; km: number; lat: number; lon: number }[]; // commerces/épiceries
+}
+
+export interface Trek {
+  name?: string;
+  mode: 'walk' | 'bike';
+  stages: StageEdge[];
+  totalKm: number;
+  totalAscent: number;
+  fromUic: string;
+  toUic?: string;           // gare d'arrivée (absent si boucle = retour gare de départ)
 }
 
 export interface TagEvidence {
