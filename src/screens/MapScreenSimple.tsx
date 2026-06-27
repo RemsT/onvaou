@@ -29,7 +29,7 @@ export default function MapScreen() {
   const navigation = useNavigation<MapScreenNavigationProp>();
   const mapRef = useRef<MapView>(null);
 
-  const { fromStation, results, mode, maxValue, searchDate, maxTransfers } = route.params;
+  const { fromStation, results, mode, maxValue, searchDate, maxTransfers, timeRangeEnd } = route.params;
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
   const [cardPosition, setCardPosition] = useState<{ x: number; y: number } | null>(null);
   const [cardHeight, setCardHeight] = useState(70);
@@ -264,7 +264,7 @@ export default function MapScreen() {
           onPress={() => navigation.navigate('DestinationDetail', {
             destination: selectedResult,
             searchDate,
-            mapParams: { fromStation, results, mode, maxValue, maxTransfers },
+            mapParams: { fromStation, results, mode, maxValue, maxTransfers, timeRangeEnd },
           })}
           activeOpacity={0.8}
         >
@@ -304,6 +304,7 @@ export default function MapScreen() {
           maxValue,
           searchDate,
           maxTransfers,
+          timeRangeEnd,
         })}
         activeOpacity={0.8}
       >

@@ -215,6 +215,7 @@ export default function HomeScreen() {
         maxValue: timeValue || budgetValue,
         searchDate: (p.selectedDate || new Date()).getTime(),
         maxTransfers,
+        timeRangeEnd: p.timeRangeEnd, // fin de plage horaire aller → retours proposés après
       });
     } catch (error) {
       setErrorMessage('Impossible de récupérer les destinations. Réessayez.');

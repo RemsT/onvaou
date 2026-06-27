@@ -24,7 +24,7 @@ type SortOrder = 'asc' | 'desc';
 // Une « envie » = un tag d'activité de la gare + la distance (vol d'oiseau) du POI le plus proche.
 type Envie = { key: string; name: string; icon: string; color: string; km: number | null };
 
-function getEnvies(stationId: number): Envie[] {
+function getEnvies(stationId: number | string): Envie[] {
   return getStationTags(stationId).map((t) => {
     const info = CITY_LABELS[t.label] || { name: t.label, icon: '•', color: '#4CAF50' };
     let km: number | null = null;
@@ -37,7 +37,7 @@ function getEnvies(stationId: number): Envie[] {
 }
 
 // Score de proximité d'une gare : distance min (vol d'oiseau) de l'activité la plus proche.
-function accessScore(stationId: number): number | null {
+function accessScore(stationId: number | string): number | null {
   const kms = getEnvies(stationId).map((e) => e.km).filter((k): k is number => k != null);
   return kms.length ? Math.min(...kms) : null;
 }
@@ -46,14 +46,17 @@ export default function ResultsListScreen() {
   const route = useRoute<ResultsListRouteProp>();
   const navigation = useNavigation<ResultsListNavigationProp>();
 
-  const { fromStation, results, mode, maxValue, searchDate, maxTransfers } = route.params;
+  const { fromStation, results, mode, maxValue, searchDate, maxTransfers, timeRangeEnd } = route.params;
   const [sortType, setSortType] = useState<SortType>('duration');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [accessibleOnly, setAccessibleOnly] = useState(false);
+  const [showTags, setShowTags] = useState(true); // tags dépliés par défaut ; peut tout cacher
   const listRef = useRef<FlatList>(null);
 
-  const toNumId = (r: SearchResult) =>
-    typeof r.to_station_id === 'number' ? r.to_station_id : parseInt(String(r.to_station_id));
+  // Tags indexés par code UIC : utiliser sncf_id en priorité (to_station_id = id GTFS temporaire qui
+  // ne résout PAS les tags). Cohérent avec le filtre de recherche et la fiche détail.
+  const tagId = (r: SearchResult): number | string =>
+    r.to_station?.sncf_id || r.to_station_id;
 
   const handleSortChange = (newSortType: SortType) => {
     if (newSortType === sortType) {
@@ -77,8 +80,8 @@ export default function ResultsListScreen() {
       comparison = aMax - bMax;
     } else if (sortType === 'access') {
       // Les gares avec activité atteignable d'abord (durée min), les autres ensuite
-      const aS = accessScore(toNumId(a)) ?? Infinity;
-      const bS = accessScore(toNumId(b)) ?? Infinity;
+      const aS = accessScore(tagId(a)) ?? Infinity;
+      const bS = accessScore(tagId(b)) ?? Infinity;
       comparison = aS - bS;
     } else {
       comparison = new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime();
@@ -91,19 +94,19 @@ export default function ResultsListScreen() {
   // Filtre « accessible à pied/vélo » : une gare est accessible si elle a des tags
   // (les tags non atteignables sont élagués à la génération → présence = accessibilité).
   const displayedResults = accessibleOnly
-    ? sortedResults.filter((r) => getStationTags(toNumId(r)).length > 0)
+    ? sortedResults.filter((r) => getStationTags(tagId(r)).length > 0)
     : sortedResults;
 
   const handleDestinationPress = (destination: SearchResult) => {
     navigation.navigate('DestinationDetail', {
       destination,
       searchDate,
-      mapParams: { fromStation, results: sortedResults, mode, maxValue, maxTransfers },
+      mapParams: { fromStation, results: sortedResults, mode, maxValue, maxTransfers, timeRangeEnd },
     });
   };
 
   const renderDestinationItem = ({ item }: { item: SearchResult }) => {
-    const numId = toNumId(item);
+    const numId = tagId(item);
     const envies = getEnvies(numId);
 
     return (
@@ -151,19 +154,16 @@ export default function ResultsListScreen() {
             </View>
           )}
         </View>
-        {envies.length > 0 && (
+        {showTags && envies.length > 0 && (
           <View style={styles.enviesBox}>
             <Text style={styles.enviesTitle}>Ce que vous pouvez faire ici</Text>
-            {envies.slice(0, 3).map((e) => (
+            {envies.map((e) => (
               <Text key={e.key} style={styles.envieLine} numberOfLines={1}>
                 <Text style={{ color: e.color }}>● </Text>
                 {e.name}
                 {e.km != null ? `  ·  à ~${e.km.toFixed(1).replace('.', ',')} km` : ''}
               </Text>
             ))}
-            {envies.length > 3 && (
-              <Text style={styles.envieMore}>+{envies.length - 3} autre{envies.length - 3 > 1 ? 's' : ''}</Text>
-            )}
           </View>
         )}
       </TouchableOpacity>
@@ -314,6 +314,17 @@ export default function ResultsListScreen() {
             🚶 Accessible à pied/vélo {accessibleOnly ? '✓' : ''}
           </Text>
         </TouchableOpacity>
+
+        {/* Affichage des activités (tags) : déplié par défaut, peut tout cacher */}
+        <TouchableOpacity
+          style={[styles.filterChip, showTags && styles.filterChipActive]}
+          onPress={() => setShowTags((v) => !v)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.filterChipText, showTags && styles.filterChipTextActive]}>
+            🏷️ Activités {showTags ? 'affichées' : 'masquées'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Liste des résultats */}
@@ -331,6 +342,7 @@ export default function ResultsListScreen() {
           ref={listRef}
           data={displayedResults}
           renderItem={renderDestinationItem}
+          extraData={showTags}
           keyExtractor={(item, index) => `result-${item.to_station_id}-${item.duration}-${index}`}
           contentContainerStyle={styles.listContent}
           refreshControl={

@@ -27,6 +27,7 @@ export type RootStackParamList = {
     maxValue?: number;
     searchDate?: number;
     maxTransfers?: number;
+    timeRangeEnd?: string;
   };
   MapView: {
     fromStation: Station;
@@ -35,6 +36,7 @@ export type RootStackParamList = {
     maxValue?: number;
     searchDate?: number;
     maxTransfers?: number;
+    timeRangeEnd?: string; // fin de la plage horaire ALLER → retours proposés après cette plage
   };
   DestinationDetail: {
     destination: SearchResult;
@@ -47,6 +49,7 @@ export type RootStackParamList = {
       mode: 'time' | 'budget' | 'both';
       maxValue?: number;
       maxTransfers?: number;
+      timeRangeEnd?: string;
     };
   };
   RouteMap: {

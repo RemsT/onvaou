@@ -4,7 +4,7 @@ import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../navigation/AppNavigatorSimple';
-import { openDirections, isBeyondBikeCap, MAX_BIKE_MIN } from '../utils/directions';
+import { openDirections, openRouteInMaps, isBeyondBikeCap, MAX_BIKE_MIN } from '../utils/directions';
 import { fetchRoute, RouteResult, decodePolyline6 } from '../services/routingService';
 import { estimateMinutes } from '../utils/effort';
 import { shareTrailGpx } from '../utils/shareGpx';
@@ -386,20 +386,31 @@ export default function RouteMapScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* Export GPX (mode trail) — partage cross-plateforme iOS/Android via la feuille native. */}
+        {/* Mode trail : Exporter le .gpx (enregistrer/partager) + Ouvrir le .gpx (choisir l'app :
+            OsmAnd/Komoot/Fichiers…). Les deux passent par la feuille native (vrai tracé du sentier). */}
         {trail && (
-          <TouchableOpacity
-            style={styles.btnSecondary}
-            activeOpacity={0.85}
-            disabled={exporting}
-            onPress={async () => {
-              setExporting(true);
-              try { await shareTrailGpx(trail); } catch {} finally { setExporting(false); }
-            }}
-          >
-            <Ionicons name="download-outline" size={16} color="#0C3823" />
-            <Text style={styles.btnSecondaryText}>{exporting ? 'Export…' : 'Exporter en GPX'}</Text>
-          </TouchableOpacity>
+          <View style={styles.btnRow}>
+            <TouchableOpacity
+              style={[styles.btnSecondary, styles.btnRowItem]}
+              activeOpacity={0.85}
+              disabled={exporting}
+              onPress={async () => {
+                setExporting(true);
+                try { await shareTrailGpx(trail); } catch {} finally { setExporting(false); }
+              }}
+            >
+              <Ionicons name="download-outline" size={16} color="#0C3823" />
+              <Text style={styles.btnSecondaryText} numberOfLines={1}>{exporting ? '…' : 'Exporter GPX'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btnSecondary, styles.btnRowItem]}
+              activeOpacity={0.85}
+              onPress={() => trailCoords && openRouteInMaps(trailCoords, trail.mode)}
+            >
+              <Ionicons name="map-outline" size={16} color="#0C3823" />
+              <Text style={styles.btnSecondaryText} numberOfLines={1}>Ouvrir dans Maps</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     </View>
@@ -480,4 +491,6 @@ const styles = StyleSheet.create({
     paddingVertical: 11, borderRadius: 12, marginTop: 8,
   },
   btnSecondaryText: { color: '#0C3823', fontSize: 14, fontWeight: '700' },
+  btnRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  btnRowItem: { flex: 1, marginTop: 0 },
 });

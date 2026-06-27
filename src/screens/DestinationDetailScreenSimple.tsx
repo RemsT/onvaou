@@ -58,7 +58,7 @@ export default function DestinationDetailScreen() {
   const mapRef = useRef<MapView>(null);
   const [expandedTag, setExpandedTag] = useState<CityLabel | null>(null);
   // Retours possibles vers la gare de départ (dans la journée)
-  const [returns, setReturns] = useState<Array<{ time: string; arrival: string; duration: number; transfers: number }> | undefined>(undefined);
+  const [returns, setReturns] = useState<Array<{ time: string; arrival: string; duration: number; transfers: number; nextDay: boolean }> | undefined>(undefined);
   const [showReturns, setShowReturns] = useState(false);
   const [showAllDepartures, setShowAllDepartures] = useState(true);
   const [selectedDepartureHHMM, setSelectedDepartureHHMM] = useState<string>(
@@ -152,8 +152,17 @@ export default function DestinationDetailScreen() {
     // Heure d'arrivée = départ choisi (dans la plage de recherche) + durée du trajet.
     const [dh, dm] = selectedDepartureHHMM.split(':').map(Number);
     const arrMin = dh * 60 + dm + destination.duration;
+    // Les retours doivent être HORS de la plage horaire aller : on part du max(arrivée, fin de plage).
+    const rangeEnd = mapParams?.timeRangeEnd;
+    let fromMin = arrMin;
+    if (rangeEnd) {
+      const [rh, rm] = rangeEnd.split(':').map(Number);
+      if (!isNaN(rh)) fromMin = Math.max(arrMin, rh * 60 + (rm || 0));
+    }
     const pad = (n: number) => n.toString().padStart(2, '0');
-    const afterTime = `${pad(Math.floor(arrMin / 60) % 24)}:${pad(arrMin % 60)}:00`;
+    // Pas de % 24 : si c'est après minuit, on garde la notation 24:xx/25:xx du GTFS SNCF
+    // pour que les retours après minuit soient bien trouvés (sinon heure « repliée » → retours faux).
+    const afterTime = `${pad(Math.floor(fromMin / 60))}:${pad(fromMin % 60)}:00`;
     const maxTransfers = mapParams?.maxTransfers ?? 0;
     LocalSearchService.getReturns(destination.to_station, departureStation, afterTime, maxTransfers)
       .then((r) => { if (alive) setReturns(r); })
@@ -725,13 +734,18 @@ export default function DestinationDetailScreen() {
                 </TouchableOpacity>
                 {showReturns && (
                   <View style={styles.departureChips}>
-                    {returns.map((r, i) => (
-                      <View key={i} style={styles.departureChip}>
-                        <Text style={styles.departureChipText}>
-                          {r.time.replace(':', 'h')}{r.transfers > 0 ? ' · corresp.' : ''}
-                        </Text>
-                      </View>
-                    ))}
+                    {returns.map((r, i) => {
+                      // Normalise les horaires après minuit (GTFS 24:xx → 00:xx) + marque « +1j ».
+                      const [hh, mm] = r.time.split(':').map(Number);
+                      const disp = `${(hh % 24).toString().padStart(2, '0')}h${(mm || 0).toString().padStart(2, '0')}`;
+                      return (
+                        <View key={i} style={[styles.departureChip, r.nextDay && styles.departureChipNextDay]}>
+                          <Text style={styles.departureChipText}>
+                            {disp}{r.nextDay ? ' +1j' : ''}{r.transfers > 0 ? ' · corresp.' : ''}
+                          </Text>
+                        </View>
+                      );
+                    })}
                   </View>
                 )}
               </>
@@ -1245,6 +1259,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#D0E8D0',
   },
+  departureChipNextDay: { backgroundColor: '#FFF3D6', borderColor: '#F0D58A' },
   departureChipFirst: {
     backgroundColor: '#4CAF50',
     borderColor: '#4CAF50',

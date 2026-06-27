@@ -16,8 +16,9 @@ export default function StationLabels({
 }: StationLabelsProps) {
   const [expandedLabel, setExpandedLabel] = useState<CityLabel | null>(null);
 
-  const numericId = typeof stationId === 'number' ? stationId : parseInt(String(stationId));
-  const tags = getStationTags(numericId);
+  // Passer l'id tel quel : getStationTags/resolveUic gère id interne, code UIC ET sncf_id complet.
+  // (parseInt cassait un sncf_id type "stop_area:OCE:SA:87746008".)
+  const tags = getStationTags(stationId);
 
   if (tags.length === 0) return null;
 

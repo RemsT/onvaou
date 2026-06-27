@@ -64,8 +64,13 @@ async function main() {
   }
   if (isFinite(LIMIT)) stations = stations.slice(0, LIMIT);
 
+  // Filtre qualité : round_trip dépasse parfois fortement la cible ou crée des boucles au D+ délirant.
+  const KM_TOL = [0.6, 1.4];                     // km accepté entre 60 % et 140 % de la cible
+  const MAX_D_PER_KM = { foot: 120, bike: 90 };  // dénivelé/km au-delà duquel la boucle est rejetée
   let calls = 0, added = 0, gares = 0;
   for (const s of stations) {
+    // Re-exécutable : on retire d'abord les anciennes boucles générées de cette gare.
+    if (data[s.uic]) data[s.uic] = data[s.uic].filter((t) => !t.generated);
     const existing = data[s.uic] || [];
     for (const mode of ['foot', 'bike']) {
       const tmode = mode === 'foot' ? 'walk' : 'bike';
@@ -80,6 +85,9 @@ async function main() {
         if (pts.length < 2) continue;
         const km = Math.round((p.distance / 1000) * 10) / 10;
         const ascent = Math.round(p.ascend || 0), descent = Math.round(p.descend || 0);
+        const targetKm = dist / 1000;
+        if (km < targetKm * KM_TOL[0] || km > targetKm * KM_TOL[1]) continue; // overshoot/undershoot
+        if (km > 0 && ascent / km > MAX_D_PER_KM[mode]) continue;             // D+ délirant
         loops.push({
           name: `Boucle ${km} km depuis ${s.name}`, mode: tmode, loop: true, km,
           minutes: estimateMinutes(tmode, km, ascent), accessKm: 0, ascent, descent,

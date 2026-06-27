@@ -344,6 +344,7 @@ export class LocalSearchService {
       timeRangeEnd,
       maxTransfers,
       selectedLabels: selectedLabels ? [...selectedLabels].sort() : [],
+      labelFilterMode, // ET/OU change le résultat → DOIT faire partie de la clé (sinon cache croisé)
       searchDate: searchDate ? searchDate.toISOString().slice(0, 10) : undefined,
       // Les critères de profil (plages rando/vélo, type, durée) modifient quelles destinations
       // portent le tag rando/vélo → invalider le cache quand ils changent.
@@ -953,7 +954,7 @@ export class LocalSearchService {
     toStation: Station,
     afterTime: string,
     maxTransfers: number = 0
-  ): Promise<Array<{ time: string; arrival: string; duration: number; transfers: number }>> {
+  ): Promise<Array<{ time: string; arrival: string; duration: number; transfers: number; nextDay: boolean }>> {
     try {
       if (!fromStation.sncf_id || !toStation.sncf_id) return [];
       await gtfsDbEnhanced.initialize();
@@ -964,7 +965,9 @@ export class LocalSearchService {
       const raw: Array<{ time: string; arrival: string; duration: number; transfers: number }> = [];
 
       if (maxTransfers <= 0) {
-        const conns = await gtfsDbEnhanced.findDirectConnections(fromId, toId, afterTime, '23:59:59', 200);
+        // Retours après l'arrivée. On inclut les trains après minuit (GTFS 24:xx–27:xx) → marqués
+        // « +1j » à l'affichage pour que l'utilisateur sache qu'ils ramènent le lendemain.
+        const conns = await gtfsDbEnhanced.findDirectConnections(fromId, toId, afterTime, '27:59:59', 200);
         for (const c of conns as any[]) {
           if (!c.departure_time) continue;
           raw.push({
@@ -996,7 +999,11 @@ export class LocalSearchService {
         const ex = byTime.get(r.time);
         if (!ex || r.duration < ex.duration) byTime.set(r.time, r);
       }
-      return [...byTime.values()].sort((a, b) => a.time.localeCompare(b.time)).slice(0, 30);
+      // nextDay = départ en notation 24:xx+ (après minuit) → ramène le lendemain.
+      return [...byTime.values()]
+        .sort((a, b) => a.time.localeCompare(b.time))
+        .slice(0, 30)
+        .map((r) => ({ ...r, nextDay: parseInt(r.time.slice(0, 2), 10) >= 24 }));
     } catch (e) {
       errorLog('[LocalSearchService] getReturns:', e);
       return [];

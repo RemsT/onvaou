@@ -58,6 +58,35 @@ export function routeToCoords(
   return (route ?? []).map(([lat, lon]) => ({ latitude: lat, longitude: lon }));
 }
 
+/**
+ * Ouvre le TRACÉ dans l'app de cartes par défaut (Google Maps si installé, sinon navigateur web ;
+ * sur Android, l'utilisateur peut choisir son app par défaut). On passe le départ, l'arrivée et
+ * jusqu'à 8 points intermédiaires échantillonnés le long du tracé → itinéraire (approx. sur routes).
+ * Pour suivre le VRAI sentier, utiliser l'export GPX (apps type OsmAnd/Komoot).
+ */
+export function openRouteInMaps(
+  coords: { latitude: number; longitude: number }[],
+  mode?: 'walk' | 'bike'
+): void {
+  if (!coords || coords.length < 2) return;
+  const tm = mode === 'bike' ? 'bicycling' : 'walking';
+  const fmt = (c: { latitude: number; longitude: number }) => `${c.latitude.toFixed(5)},${c.longitude.toFixed(5)}`;
+  const origin = fmt(coords[0]);
+  // Boucle (départ ≈ arrivée) : on décale légèrement la destination sur l'avant-dernier point pour
+  // éviter origin == destination (que Maps réduit à un point), sinon vraie arrivée.
+  const last = coords[coords.length - 1];
+  const isLoop = Math.abs(last.latitude - coords[0].latitude) < 1e-4 && Math.abs(last.longitude - coords[0].longitude) < 1e-4;
+  const destination = fmt(isLoop ? coords[Math.max(0, coords.length - 2)] : last);
+  const inner = coords.slice(1, -1);
+  const N = Math.min(9, inner.length); // Google Maps : ~9 étapes max dans l'URL
+  const wp: string[] = [];
+  for (let i = 1; i <= N; i++) wp.push(fmt(inner[Math.floor((i / (N + 1)) * inner.length)]));
+  // Séparateur d'étapes encodé (%7C) : sinon Maps ignore les waypoints → une seule étape s'affichait.
+  const wpParam = wp.length ? `&waypoints=${wp.join('%7C')}` : '';
+  const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=${tm}${wpParam}`;
+  Linking.openURL(url).catch(() => {});
+}
+
 type Origin = { lat: number; lon: number };
 type DirPoi = { name: string; lat?: number; lon?: number; mode?: 'walk' | 'bike'; km?: number };
 
