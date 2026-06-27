@@ -13,7 +13,6 @@ import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/AppNavigatorSimple';
 import { SearchResult, CITY_LABELS } from '../types';
-import StationLabels from '../components/StationLabels';
 import { PriceEstimationService } from '../services/priceEstimationService';
 import { getStationTags } from '../data/stationLabels';
 type ResultsListRouteProp = RouteProp<RootStackParamList, 'ResultsList'>;
@@ -589,11 +588,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#0C3823',
     fontWeight: '500',
-  },
-  envieMore: {
-    fontSize: 12,
-    color: '#5F6368',
-    marginTop: 1,
   },
   filterChip: {
     alignSelf: 'flex-start',

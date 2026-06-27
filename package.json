@@ -23,7 +23,8 @@
       "^expo-sqlite$": "<rootDir>/__mocks__/expo-sqlite.ts",
       "^expo-file-system/legacy$": "<rootDir>/__mocks__/expo-file-system-legacy.ts",
       "^expo-file-system$": "<rootDir>/__mocks__/expo-file-system-legacy.ts",
-      "^@react-native-async-storage/async-storage$": "<rootDir>/__mocks__/async-storage.ts"
+      "^@react-native-async-storage/async-storage$": "<rootDir>/__mocks__/async-storage.ts",
+      "/data/generatedFallback$": "<rootDir>/src/data/generatedFallback.ts"
     },
     "testMatch": [
       "**/__tests__/**/*.test.ts",

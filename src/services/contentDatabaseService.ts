@@ -21,12 +21,14 @@ import { StationData, Trail, TaggedPoi } from '../types';
 let db: SQLite.SQLiteDatabase | null = null;
 let ready = false;
 
-// ── Repli .ts (Node/tests, ou si la base n'est pas prête) ─────────────────────
-// require paresseux : sur device avec la base prête, ces modules ne sont jamais évalués.
-const fb: { labels?: any; trails?: any; campings?: any } = {};
-const fbLabels = () => (fb.labels ??= require('../data/stationLabelsGenerated').generatedLabels);
-const fbTrails = () => (fb.trails ??= require('../data/trailsGenerated').generatedTrails);
-const fbCampings = () => (fb.campings ??= require('../data/campingsGenerated').generatedCampings);
+// ── Repli données pour Node/tests UNIQUEMENT ──────────────────────────────────
+// Import statique de generatedFallback : sur device Metro résout la variante .native (VIDE) → les
+// ~19 Mo de .ts ne sont pas embarqués (content.db SQLite est la source). En jest, un moduleNameMapper
+// force le fichier .ts (vraies données) → la suite de tests garde ses données.
+import { generatedLabels as gLabels, generatedTrails as gTrails, generatedCampings as gCampings } from '../data/generatedFallback';
+const fbLabels = () => gLabels;
+const fbTrails = () => gTrails;
+const fbCampings = () => gCampings;
 
 /** Copie l'asset content.db (si besoin) et ouvre la base en lecture sync. Idempotent, sans throw. */
 export async function initContentDatabase(): Promise<void> {
