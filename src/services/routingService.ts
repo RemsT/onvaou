@@ -69,35 +69,47 @@ export async function fetchRoute(
     directions_options: { units: 'kilometers' },
   };
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-  try {
-    const res = await fetch(VALHALLA_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    const legs = json?.trip?.legs;
-    if (!Array.isArray(legs) || legs.length === 0) return null;
+  // Une tentative (timeout 8 s).
+  const attempt = async (): Promise<RouteResult | null> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(VALHALLA_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      if (!res.ok) return null;
+      const json = await res.json();
+      const legs = json?.trip?.legs;
+      if (!Array.isArray(legs) || legs.length === 0) return null;
 
-    const coords: LatLng[] = [];
-    for (const leg of legs) {
-      if (typeof leg.shape === 'string') coords.push(...decodePolyline6(leg.shape));
+      const coords: LatLng[] = [];
+      for (const leg of legs) {
+        if (typeof leg.shape === 'string') coords.push(...decodePolyline6(leg.shape));
+      }
+      if (coords.length < 2) return null;
+
+      const summary = json.trip.summary ?? {};
+      return {
+        coords,
+        km: typeof summary.length === 'number' ? summary.length : 0,
+        minutes: typeof summary.time === 'number' ? Math.round(summary.time / 60) : 0,
+      };
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timeout);
     }
-    if (coords.length < 2) return null;
+  };
 
-    const summary = json.trip.summary ?? {};
-    return {
-      coords,
-      km: typeof summary.length === 'number' ? summary.length : 0,
-      minutes: typeof summary.time === 'number' ? Math.round(summary.time / 60) : 0,
-    };
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
+  // Retry : l'instance Valhalla publique échoue parfois (limite/timeout transitoire) → on retente
+  // une fois avant d'abandonner (l'« itinéraire indisponible » devient ainsi plus rare).
+  for (let i = 0; i < 2; i++) {
+    const r = await attempt();
+    if (r) return r;
+    if (i === 0) await new Promise((resolve) => setTimeout(resolve, 600));
   }
+  return null;
 }

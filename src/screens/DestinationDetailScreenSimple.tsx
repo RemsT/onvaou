@@ -602,6 +602,8 @@ export default function DestinationDetailScreen() {
                         display="inline"
                         locale="fr-FR"
                         minimumDate={minDate}
+                        themeVariant="light"
+                        accentColor="#4CAF50"
                         onChange={(_e, date) => onPickDate(date)}
                       />
                       <TouchableOpacity style={styles.calendarDone} onPress={() => setShowCalendar(false)}>
@@ -1085,8 +1087,8 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   sectionSubtitle: { fontSize: 12, color: '#5F6368', marginTop: 4, marginBottom: 8 },
-  calendarOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: 24 },
-  calendarSheet: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 12 },
+  calendarOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: 12 },
+  calendarSheet: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 8, alignItems: 'stretch' },
   calendarDone: {
     backgroundColor: '#4CAF50', paddingVertical: 12, borderRadius: 12,
     alignItems: 'center', marginTop: 8,

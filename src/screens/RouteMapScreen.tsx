@@ -408,7 +408,7 @@ export default function RouteMapScreen() {
               onPress={() => trailCoords && openRouteInMaps(trailCoords, trail.mode)}
             >
               <Ionicons name="map-outline" size={16} color="#0C3823" />
-              <Text style={styles.btnSecondaryText} numberOfLines={1}>Ouvrir dans Maps</Text>
+              <Text style={styles.btnSecondaryText} numberOfLines={1}>Aperçu Maps</Text>
             </TouchableOpacity>
           </View>
         )}
