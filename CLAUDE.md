@@ -137,3 +137,25 @@ Règles vérifiées à la dure (ne PAS refaire ces erreurs) :
 npx expo start          # démarrer le serveur de dev
 npx tsc --noEmit        # vérifier les types
 ```
+
+## Préparer un build / publier (RÈGLES À RESPECTER — ne pas oublier)
+
+⚠️ Le **numéro de build** (versionCode Android / buildNumber iOS) doit être **STRICTEMENT supérieur
+au plus haut déjà accepté par le store** — sinon upload **refusé**. Ne JAMAIS le deviner : le calculer
+automatiquement depuis l'historique EAS.
+
+```bash
+npm run prepare-build android    # = (plus haut build EAS) + 1, appliqué via set-version (versionName gardée)
+npm run prepare-build -- --dry   # afficher seulement
+git add -A && git commit ...     # COMMITTER le bump AVANT le build (EAS build depuis le commit)
+eas build -p android --profile production
+```
+
+- **Versions toujours via script** (`npm run set-version` / `prepare-build`), **jamais à la main** —
+  l'`Info.plist` iOS dérive du pbxproj (`$(MARKETING_VERSION)`/`$(CURRENT_PROJECT_VERSION)`).
+- **EAS build = depuis le commit git** → committer le bump d'abord.
+- **iOS** : build LOCAL cassé sur Xcode 26 (SwiftUICore ; + projet dans `~/Documents` = TCC
+  « Operation not permitted ») → **passer par EAS Build** (cloud).
+- **Android** : `.aab` = Play Store (upload Play Console, ou `eas submit` avec compte de service).
+  Un `.aab` ne s'installe pas sur device → pour tester sur téléphone, **APK** via `--profile preview`.
+- `eas.json` : `appVersionSource: "local"` + `production.autoIncrement: false` (numérotation manuelle).

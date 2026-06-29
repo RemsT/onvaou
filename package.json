@@ -12,7 +12,8 @@
     "test:coverage": "jest --coverage",
     "set-version": "node scripts/set-version.js",
     "enrich-elevation": "node scripts/enrich-trails-elevation.js",
-    "build-content": "node scripts/build-content-db.js"
+    "build-content": "node scripts/build-content-db.js",
+    "prepare-build": "node scripts/prepare-build.js"
   },
   "jest": {
     "preset": "jest-expo",
